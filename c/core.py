@@ -5,9 +5,11 @@
 
 import ctypes
 
-import _c
+from . import _c
 
-for version in ['3.2', '3.1', '3.0', '2.9']:
+# There are subtle differences between versions.
+# I have not yet investigated what is necessary to support more than one.
+for version in ['3.1']:
     try:
         _library = _c.Library('libLLVM-%s.so.1' % version)
         break
@@ -228,8 +230,8 @@ DisposeMessage = _library.function(None, 'LLVMDisposeMessage', [_c.string_buffer
 ContextCreate = _library.function(Context, 'LLVMContextCreate', [])
 GetGlobalContext = _library.function(Context, 'LLVMGetGlobalContext', [])
 ContextDispose = _library.function(None, 'LLVMContextDispose', [Context])
-GetMDKindIDInContext = _library.function(ctypes.c_uint, 'LLVMGetMDKindIDInContext', [Context, ctypes.c_char_p, ctypes.c_uint])
-GetMDKindID = _library.function(ctypes.c_uint, 'LLVMGetMDKindID', [ctypes.c_char_p, ctypes.c_uint])
+GetMDKindIDInContext = _library.function(ctypes.c_uint, 'LLVMGetMDKindIDInContext', [Context, ctypes.POINTER(ctypes.c_char), ctypes.c_uint])
+GetMDKindID = _library.function(ctypes.c_uint, 'LLVMGetMDKindID', [ctypes.POINTER(ctypes.c_char), ctypes.c_uint])
 
 
 ModuleCreateWithName = _library.function(Module, 'LLVMModuleCreateWithName', [ctypes.c_char_p])
@@ -242,7 +244,7 @@ GetTarget = _library.function(ctypes.c_char_p, 'LLVMGetTarget', [Module])
 SetTarget = _library.function(None, 'LLVMSetTarget', [Module, ctypes.c_char_p])
 DumpModule = _library.function(None, 'LLVMDumpModule', [Module])
 SetModuleInlineAsm = _library.function(None, 'LLVMSetModuleInlineAsm', [Module, ctypes.c_char_p])
-GetModuleContext =_library.function(Context, 'LLVMGetModuleContext', [Module])
+GetModuleContext = _library.function(Context, 'LLVMGetModuleContext', [Module])
 GetTypeByName = _library.function(Type, 'LLVMGetTypeByName', [Module, ctypes.c_char_p])
 
 GetNamedMetadataNumOperands = _library.function(ctypes.c_uint, 'LLVMGetNamedMetadataNumOperands', [Module, ctypes.c_char_p])
@@ -295,10 +297,10 @@ PPCFP128Type = _library.function(Type, 'LLVMPPCFP128Type', [])
 
 
 FunctionType = _library.function(Type, 'LLVMFunctionType', [Type, ctypes.POINTER(Type), ctypes.c_uint, Bool])
-IsFunctionVarArg = _library.function(Bool, 'LLVMIsFunctionVarArg', [Type]);
-GetReturnType = _library.function(Type, 'LLVMGetReturnType', [Type]);
-CountParamTypes = _library.function(ctypes.c_uint, 'LLVMCountParamTypes', [Type]);
-GetParamTypes = _library.function(None, 'LLVMGetParamTypes', [Type, ctypes.POINTER(Type)]);
+IsFunctionVarArg = _library.function(Bool, 'LLVMIsFunctionVarArg', [Type])
+GetReturnType = _library.function(Type, 'LLVMGetReturnType', [Type])
+CountParamTypes = _library.function(ctypes.c_uint, 'LLVMCountParamTypes', [Type])
+GetParamTypes = _library.function(None, 'LLVMGetParamTypes', [Type, ctypes.POINTER(Type)])
 
 
 StructTypeInContext = _library.function(Type, 'LLVMStructTypeInContext', [Context, ctypes.POINTER(Type), ctypes.c_uint, Bool])

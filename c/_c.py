@@ -33,6 +33,18 @@ def enum(name, **kwargs):
         __slots__ = ()
         _fields_ = [('value', ctypes.c_int)]
 
+        def __hash__(self):
+            return hash(self.value)
+
+        def __eq__(self, other):
+            return self.value == other.value
+
+        def __ne__(self, other):
+            return self.value != other.value
+
+        def __bool__(self):
+            return self.value
+
     Enum.__name__ = name
     for k,v in kwargs.items():
         setattr(Enum, k, Enum(v))
@@ -49,3 +61,11 @@ def bit_enum(name, **kwargs):
     return Enum
 
 string_buffer = ctypes.POINTER(ctypes.c_char)
+
+def pointer_value(ptr):
+    return ctypes.cast(ctypes.pointer(ptr),
+            ctypes.POINTER(ctypes.c_size_t)
+            ).contents.value
+
+def pointer_same(a, b):
+    return pointer_value(a) == pointer_value(b)
