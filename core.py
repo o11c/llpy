@@ -3,6 +3,7 @@
     GPL3+. Some day I'll put the full copyright header here ...
 '''
 
+import ctypes # some wrappers need to know
 import sys
 import weakref
 
@@ -20,10 +21,6 @@ from llpy.c.core import (
         RealPredicate,
         LandingPadClauseTy,
 )
-
-#def ConstantFP:
-#def Function:
-#def FunctionType:
 
 ## Not sure what these are for.
 #InitializeCore = _library.function(None, 'LLVMInitializeCore', [PassRegistry])
@@ -55,6 +52,29 @@ class Context:
     def GetMDKindID(self, name):
         bname = u2b(name)
         return _core.GetMDKindIDInContext(self._raw, bname, len(bname))
+
+    def ConstString(self, value, dont_null_terminate=False):
+        ''' Create a ConstantDataSequential with string content in the global context.
+        '''
+        bvalue = u2b(value)
+        blen = len(bvalue)
+        return Value(_core.ConstStringInContext(self._raw, bvalue, blen, dont_null_terminate) , self)
+
+    def ConstStruct(self, values, packed=False):
+        ''' Create an anonymous ConstantStruct with the specified values.
+        '''
+        n = len(values)
+        raw_values = (_core.Value * n)(*[i._raw for i in values])
+        return Value(_core.ConstStructInContext(self._raw, raw_values, n, packed), self)
+
+    def MDString(self, s):
+        buf = u2b(s)
+        return Value(_core.MDStringInContext(self._raw, buf, len(buf)), self)
+
+    def MDNode(self, values):
+        n = len(values)
+        raw_values = (_core.Value * n)(*[i._raw for i in values])
+        return Value(_core.MDNodeInContext(self._raw, raw_values, n), self)
 
 class Module:
     ''' Modules represent the top-level structure in a LLVM program. An LLVM
@@ -154,7 +174,21 @@ class Module:
         ''' Obtain an iterator to the last Function in a Module.
         '''
         return Value(_core.GetLastFunction(self._raw), self._context)
-    # see class Function for increment/decrement
+    # see class Function for next/prev
+
+    def AddGlobal(self, ty, name, address_space=0):
+        return Value(_core.AddGlobalInAddressSpace(self._raw, ty._raw, u2b(name), address_space), self._context)
+    def GetNamedGlobal(self, name):
+        return Value(_core.GetNamedGlobal(self._raw, u2b(name)), self._context)
+    def GetFirstGlobal(self):
+        return Value(_core.GetFirstGlobal(self._raw), self._context)
+    def GetLastGlobal(self):
+        return Value(_core.GetLastGlobal(self._raw), self._context)
+    # see class GlobalVariable for next/prev
+
+    def AddAlias(self, ty, val, name):
+        return Value(_core.AddAlias(self._raw, ty._raw, val._raw, u2b(name)), self._context)
+
 
 class Type:
     ''' Types represent the type of a value.
@@ -181,7 +215,9 @@ class Type:
             opaque type
     '''
     kind_type_map = {}
-    __slots__ = ('_raw', '_context')
+
+    __slots__ = ('_raw', '_context', '__weakref__')
+
     def __new__(cls, raw, context):
         ''' Deeply magic wrapper that constructs a Type from a C Type*.
 
@@ -191,9 +227,9 @@ class Type:
         assert isinstance(raw, _core.Type)
         assert isinstance(context, Context)
         assert cls == Type # subclasses must override it
-        raw_ptr = _c.pointer_value(raw)
-        if raw_ptr == 0:
+        if not raw:
             return None
+        raw_ptr = _c.pointer_value(raw)
         try:
             return context.type_cache[raw_ptr]
         except KeyError:
@@ -231,6 +267,42 @@ class Type:
         '''
         return self._context
 
+    def ConstNull(self):
+        ''' Obtain a constant value referring to the null instance of a type.
+        '''
+        return Value(_core.ConstNull(self._raw), self._context)
+
+    def GetUndef(self):
+        ''' Obtain a constant value referring to an undefined value of a type.
+        '''
+        return Value(_core.GetUndef(self._raw), self._context)
+
+    def ConstPointerNull(self):
+        ''' Obtain a constant that is a constant pointer pointing to NULL for a
+            specified type.
+        '''
+        return Value(_core.ConstPointerNull(self._raw), self._context)
+
+    def ConstArray(self, values):
+        ''' Create a ConstantArray from values.
+        '''
+        n = len(values)
+        raw_values = (_core.Value * n)(*[i._raw for i in values])
+        return Value(_core.ConstArray(self._raw, raw_values, n), self._context)
+
+    def AlignOf():
+        ''' Computes the alignment of a type in a target independent way.
+
+            Note: the return value is a Constant i64.
+        '''
+        return Value(_core.AlignOf(self._raw), self._context)
+    def SizeOf():
+        ''' Computes the (alloc) size of a type (in address-units, not bits) in a target independent way.
+
+            Note: the return value is a Constant i64.
+        '''
+        return Value(_core.SizeOf(self._raw), self._context)
+
 class IntegerType(Type):
     __slots__ = ()
     def __new__(cls, context, bits):
@@ -244,6 +316,29 @@ class IntegerType(Type):
 
     def GetIntTypeWidth(self):
         return _core.GetIntTypeWidth(self._raw)
+
+    def ConstAllOnes(self):
+        ''' Obtain a constant value referring to the instance of a type
+            consisting of all ones.
+        '''
+        return Value(_core.ConstAllOnes(self._raw), self._context)
+
+    def ConstInt(self, value):
+        ''' Obtain a constant value for an integer type.
+        '''
+        assert isinstance(value, int)
+        # due to the python nature, this is probably more efficient than
+        # converting to an array of uint64_t
+        return self.ConstIntOfString(str(value), 10)
+
+    def ConstIntOfString(self, value, radix):
+        ''' Obtain a constant value for an integer parsed from a string.
+        '''
+        assert isinstance(value, str)
+        bvalue = u2b(value)
+        blen = len(bvalue)
+        return Value(_core.ConstIntOfStringAndSize(self._raw, bvalue, blen, radix), self._context)
+
 Type.kind_type_map[TypeKind.Integer] = IntegerType
 
 class RealType(Type):
@@ -252,6 +347,21 @@ class RealType(Type):
     __slots__ = ()
     def __new__(cls):
         raise TypeError
+
+    def ConstReal(self, value):
+        ''' Obtain a constant value referring to a floating point value
+            represented as a C double (Python float).
+        '''
+        assert isinstance(value, float)
+        return Value(_core.ConstReal(self._raw, value), self._context)
+
+    def ConstRealOfString(self, value):
+        ''' Obtain a constant for a floating point value parsed from a string.
+        '''
+        assert isinstance(value, str)
+        bvalue = u2b(value)
+        blen = len(bvalue)
+        return Value(_core.ConstRealOfStringAndSize(self._raw, bvalue, blen), self._context)
 
 class HalfType(RealType):
     __slots__ = ()
@@ -339,7 +449,7 @@ class FunctionType(Type):
         n = len(params)
         raw_params = (_core.Type * n)(*[i._raw for i in params])
         raw_ft = _core.FunctionType(rt._raw, raw_params, n, is_var_arg)
-        self = Type.__new__(self, raw_ft, rt._context)
+        self = Type.__new__(Type, raw_ft, rt._context)
         assert type(self) is FunctionType
         return self
 
@@ -416,6 +526,14 @@ class StructType(Type):
         ''' Determine whether a structure is opaque.
         '''
         return bool(_core.IsOpaqueStruct(self._raw))
+
+    def ConstNamedStruct(self, values):
+        ''' Create a non-anonymous ConstantStruct from values.
+        '''
+        n = len(values)
+        raw_values = (_core.Value * n)(*[i._raw for i in values])
+        return Value(_core.ConstNamedStruct(self._raw, raw_values, n), self._context)
+
 Type.kind_type_map[TypeKind.Struct] = StructType
 
 class SequentialType(Type):
@@ -530,25 +648,27 @@ class X86MMXType(Type):
         return self
 Type.kind_type_map[TypeKind.X86_MMX] = X86MMXType
 
-if 1:
-    # I'm not sure how to instantiate this in the C API ...
-    class MetadataType(Type):
-        __slots__ = ()
-        def __new__(cls):
-            raise NotImplementedError
-    Type.kind_type_map[TypeKind.Metadata] = MetadataType
+class MetadataType(Type):
+    __slots__ = ()
+    def __new__(cls):
+        ''' Unlike the rest, there is no direct way to get this singleton.
+
+            However, .TypeOf on an MDNode or MDString will return this.
+        '''
+        raise NotImplementedError
+Type.kind_type_map[TypeKind.Metadata] = MetadataType
 
 
 class Value:
-    __slots__ = ('_raw', '_context')
+    __slots__ = ('_raw', '_context', '__weakref__')
 
     def __new__(cls, raw, context):
         assert isinstance(raw, _core.Value)
         assert isinstance(context, Context)
         assert cls == Value # do not attempt to create a subclass directly.
-        raw_ptr = _c.pointer_value(raw)
-        if raw_ptr == 0:
+        if not raw:
             return None
+        raw_ptr = _c.pointer_value(raw)
         try:
             return context.value_cache[raw_ptr]
         except KeyError:
@@ -573,7 +693,7 @@ class Value:
                 if _core.IsABlockAddress(value): return BlockAddress
                 if _core.IsAConstantAggregateZero(value): return ConstantAggregateZero
                 if _core.IsAConstantArray(value): return ConstantArray
-                if _core.IsAConstantExpr(value): return ConstantExpr
+                if _core.IsAConstantExpr(value): return ConstantExpr._figure_out(value)
                 if _core.IsAConstantFP(value): return ConstantFP
                 if _core.IsAConstantInt(value): return ConstantInt
                 if _core.IsAConstantPointerNull(value): return ConstantPointerNull
@@ -586,7 +706,8 @@ class Value:
                     print('Uh-oh, unknown GlobalValue subclass.', file=sys.stderr)
                     return GlobalValue
                 if _core.IsAUndefValue(value): return UndefValue
-                print('Uh-oh, unknown Constant subclass.', file=sys.stderr)
+                # This happens for string literals!
+                #print('Uh-oh, unknown Constant subclass.', file=sys.stderr)
                 return Constant
             if _core.IsAInstruction(value):
                 if _core.IsABinaryOperator(value): return BinaryOperator
@@ -678,9 +799,49 @@ class Value:
     def IsUndef(self):
         return bool(_core.IsUndef(self._raw))
 
+    def GetFirstUse(self):
+        ''' Obtain the first use of a value.
+
+            Uses are obtained in an iterator fashion. First, call this
+            function to obtain a reference to the first use. Then, call
+            GetNextUse() on that instance and all subsequently obtained
+            instances until GetNextUse() returns None.
+        '''
 
 class Argument(Value):
     __slots__ = ()
+
+    def GetParamParent(self):
+        ''' Obtain the function to which this argument belongs.
+        '''
+        return Value(_core.GetParamParent(self._raw), self._context)
+
+    def GetNextParam(self):
+        ''' Obtain the next parameter to a function.
+        '''
+        return Value(_core.GetNextParam(self._raw), self._context)
+    def GetPreviousParam(self):
+        ''' Obtain the previous parameter to a function.
+        '''
+        return Value(_core.GetPreviousParam(self._raw), self._context)
+
+    def AddAttribute(self, pa):
+        ''' Add an attribute to a function argument.
+        '''
+        _core.AddAttribute(self._raw, pa)
+    def RemoveAttribute(self, pa):
+        ''' Remove an attribute from a function argument.
+        '''
+        _core.RemoveAttribute(self._raw, pa)
+    def GetAttribute(self):
+        ''' Get an attribute from a function argument.
+        '''
+        return _core.GetAttribute(self._raw)
+    def SetParamAlignment(self, align):
+        ''' Set the alignment for a function parameter.
+        '''
+        _core.SetParamAlignment(self._raw, align)
+
 
 class BasicBlock(Value):
     __slots__ = ('_raw_bb',)
@@ -695,8 +856,78 @@ class BasicBlock(Value):
         if not hasattr(self, '_raw_bb'):
             self._raw_bb = _core.ValueAsBasicBlock(raw)
 
+    def GetBasicBlockParent(self):
+        ''' Obtain the function to which a basic block belongs.
+        '''
+        return Value(_core.GetBasicBlockParent(self._raw_bb), self._context)
+
+    def GetBasicBlockTerminator(self):
+        ''' Obtain the terminator instruction for a basic block.
+
+            If the basic block does not have a terminator (it is not
+            well-formed if it doesn't), then NULL is returned.
+        '''
+        return Value(_core.GetBasicBlockTerminator(self._raw_bb), self._context)
+
+    def GetNextBasicBlock(self):
+        ''' Advance a basic block iterator.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.GetNextBasicBlock(self._raw_bb)), self._context)
+    def GetPreviousBasicBlock(self):
+        ''' Go backwards in a basic block iterator.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.GetPreviousBasicBlock(self._raw_bb)), self._context)
+
+    def InsertBasicBlock(self, name):
+        ''' Insert a basic block in a function before another basic block.
+
+            The function to add to is determined by the function of the
+            passed basic block.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.InsertBasicBlockInContext(self._context, self._raw_bb, u2b(name))), self._context)
+
+    def DeleteBasicBlock(self):
+        ''' Remove a basic block from a function and delete it.
+
+            This deletes the basic block from its containing function and
+            deletes the basic block itself.
+        '''
+        _core.DeleteBasicBlock(self._raw_bb)
+    if 0:
+        # This frontend does not support detached BBs.
+        def RemoveBasicBlockFromParent(self):
+            ''' Remove a basic block from a function.
+
+                This deletes the basic block from its containing function
+                but keep the basic block alive.
+            '''
+            _core.RemoveBasicBlockFromParent(self._raw_bb)
+    def MoveBasicBlockBefore(self, other):
+        ''' Move a basic block to before another one.
+        '''
+        _core.MoveBasicBlockBefore(self._raw, other._raw)
+    def MoveBasicBlockAfter(self, other):
+        ''' Move a basic block to after another one.
+        '''
+        _core.MoveBasicBlockAfter(self._raw, other._raw)
+    def GetFirstInstruction(self):
+        ''' Obtain the first Instruction in a basic block.
+        '''
+        return Value(_core.GetFirstInstruction(self._raw_bb), self._context)
+    def GetLastInstruction(self):
+        ''' Obtain the last instruction in a basic block.
+        '''
+        return Value(_core.GetLastInstruction(self._raw_bb), self_context)
+    # see also next/prev in Instruction
+
+
 class InlineAsm(Value):
     __slots__ = ()
+
+    def __new__(cls, fty, asm_string, constraints, has_side_effects, is_align_stack):
+        assert cls == InlineAsm
+        assert isinstance(fty, FunctionType)
+        return Value(_core.ConstInlineAsm(fty._raw, u2b(asm_string), u2b(constraints), has_side_effects, is_align_stack), fty._context)
 
 class MDNode(Value):
     __slots__ = ()
@@ -704,14 +935,162 @@ class MDNode(Value):
 class MDString(Value):
     __slots__ = ()
 
+    def GetMDString(self):
+        raw_len = ctypes.c_uint()
+        raw_out = _core.GetMDString(self._raw, ctypes.byref(raw_len))
+        return b2u(_c.buffer_as_bytes(raw_out, raw_len.value))
+
+
 class User(Value):
     __slots__ = ()
+
+    def GetOperand(self, index):
+        return Value(_core.GetOperand(self._raw, index), self._context)
+
+    def SetOperand(self, index, value):
+        _core.SetOperand(self._raw, index, value._raw)
+
+    def GetNumOperands(self):
+        return _core.GetNumOperands(self._raw)
 
 class  Constant(User):
     __slots__ = ()
 
+    def IsNull(self):
+        ''' Determine whether a value instance is null.
+        '''
+        return bool(_core.IsNull(self._raw))
+
+    def ConstNeg(self):
+        return Value(_core.ConstNeg(self._raw), self._context)
+    def ConstNSWNeg(self):
+        return Value(_core.ConstNSWNeg(self._raw), self._context)
+    def ConstNUWNeg(self):
+        return Value(_core.ConstNUWNeg(self._raw), self._context)
+    def ConstFNeg(self):
+        return Value(_core.ConstFNeg(self._raw), self._context)
+    def ConstNot(self):
+        return Value(_core.ConstNot(self._raw), self._context)
+    def ConstAdd(self, other):
+        return Value(_core.ConstAdd(self._raw, other._raw), self._context)
+    def ConstNSWAdd(self, other):
+        return Value(_core.ConstNSWAdd(self._raw, other._raw), self._context)
+    def ConstNUWAdd(self, other):
+        return Value(_core.ConstNUWAdd(self._raw, other._raw), self._context)
+    def ConstFAdd(self, other):
+        return Value(_core.ConstFAdd(self._raw, other._raw), self._context)
+    def ConstSub(self, other):
+        return Value(_core.ConstSub(self._raw, other._raw), self._context)
+    def ConstNSWSub(self, other):
+        return Value(_core.ConstNSWSub(self._raw, other._raw), self._context)
+    def ConstNUWSub(self, other):
+        return Value(_core.ConstNUWSub(self._raw, other._raw), self._context)
+    def ConstFSub(self, other):
+        return Value(_core.ConstFSub(self._raw, other._raw), self._context)
+    def ConstMul(self, other):
+        return Value(_core.ConstMul(self._raw, other._raw), self._context)
+    def ConstNSWMul(self, other):
+        return Value(_core.ConstNSWMul(self._raw, other._raw), self._context)
+    def ConstNUWMul(self, other):
+        return Value(_core.ConstNUWMul(self._raw, other._raw), self._context)
+    def ConstFMul(self, other):
+        return Value(_core.ConstFMul(self._raw, other._raw), self._context)
+    def ConstUDiv(self, other):
+        return Value(_core.ConstUDiv(self._raw, other._raw), self._context)
+    def ConstSDiv(self, other):
+        return Value(_core.ConstSDiv(self._raw, other._raw), self._context)
+    def ConstExactSDiv(self, other):
+        return Value(_core.ConstExactSDiv(self._raw, other._raw), self._context)
+    def ConstFDiv(self, other):
+        return Value(_core.ConstFDiv(self._raw, other._raw), self._context)
+    def ConstURem(self, other):
+        return Value(_core.ConstURem(self._raw, other._raw), self._context)
+    def ConstSRem(self, other):
+        return Value(_core.ConstSRem(self._raw, other._raw), self._context)
+    def ConstFRem(self, other):
+        return Value(_core.ConstFRem(self._raw, other._raw), self._context)
+    def ConstAnd(self, other):
+        return Value(_core.ConstAnd(self._raw, other._raw), self._context)
+    def ConstOr(self, other):
+        return Value(_core.ConstOr(self._raw, other._raw), self._context)
+    def ConstXor(self, other):
+        return Value(_core.ConstXor(self._raw, other._raw), self._context)
+    def ConstICmp(self, ipred, other):
+        return Value(_core.ConstICmp(ipred, self._raw, other._raw), self._context)
+    def ConstFCmp(self, rpred, other):
+        return Value(_core.ConstFCmp(rpred, self._raw, other._raw), self._context)
+    def ConstShl(self, other):
+        return Value(_core.ConstShl(self._raw, other._raw), self._context)
+    def ConstLShr(self, other):
+        return Value(_core.ConstLShr(self._raw, other._raw), self._context)
+    def ConstAShr(self, other):
+        return Value(_core.ConstAShr(self._raw, other._raw), self._context)
+    def ConstGEP(self, indices):
+        n = len(indices)
+        raw_indices = (_core.Value * n)(*[i._raw for i in indices])
+        return Value(_core.ConstGEP(self._raw, raw_indices, n), self._context)
+    def ConstInBoundsGEP(self, indices):
+        n = len(indices)
+        raw_indices = (_core.Value * n)(*[i._raw for i in indices])
+        return Value(_core.ConstInBoundsGEP(self._raw, raw_indices, n), self._context)
+    def ConstTrunc(self, ty):
+        return Value(_core.ConstTrunc(self._raw, ty._raw), self._context)
+    def ConstSExt(self, ty):
+        return Value(_core.ConstSExt(self._raw, ty._raw), self._context)
+    def ConstZExt(self, ty):
+        return Value(_core.ConstZExt(self._raw, ty._raw), self._context)
+    def ConstFPTrunc(self, ty):
+        return Value(_core.ConstFPTrunc(self._raw, ty._raw), self._context)
+    def ConstFPExt(self, ty):
+        return Value(_core.ConstFPExt(self._raw, ty._raw), self._context)
+    def ConstUIToFP(self, ty):
+        return Value(_core.ConstUIToFP(self._raw, ty._raw), self._context)
+    def ConstSIToFP(self, ty):
+        return Value(_core.ConstSIToFP(self._raw, ty._raw), self._context)
+    def ConstFPToUI(self, ty):
+        return Value(_core.ConstFPToUI(self._raw, ty._raw), self._context)
+    def ConstFPToSI(self, ty):
+        return Value(_core.ConstFPToSI(self._raw, ty._raw), self._context)
+    def ConstPtrToInt(self, ty):
+        return Value(_core.ConstPtrToInt(self._raw, ty._raw), self._context)
+    def ConstIntToPtr(self, ty):
+        return Value(_core.ConstIntToPtr(self._raw, ty._raw), self._context)
+    def ConstBitCast(self, ty):
+        return Value(_core.ConstBitCast(self._raw, ty._raw), self._context)
+    def ConstZExtOrBitCast(self, ty):
+        return Value(_core.ConstZExtOrBitCast(self._raw, ty._raw), self._context)
+    def ConstSExtOrBitCast(self, ty):
+        return Value(_core.ConstSExtOrBitCast(self._raw, ty._raw), self._context)
+    def ConstTruncOrBitCast(self, ty):
+        return Value(_core.ConstTruncOrBitCast(self._raw, ty._raw), self._context)
+    def ConstPointerCast(self, ty):
+        return Value(_core.ConstPointerCast(self._raw, ty._raw), self._context)
+    def ConstIntCast(self, ty, is_signed):
+        return Value(_core.ConstIntCast(self._raw, ty._raw, is_signed), self._context)
+    def ConstFPCast(self, ty):
+        return Value(_core.ConstFPCast(self._raw, ty._raw), self._context)
+    def ConstSelect(self, if_true, if_false):
+        return Value(_core.ConstSelect(self._raw, if_true._raw, if_false._raw), self._context)
+    def ConstExtractElement(self, index):
+        return Value(_core.ConstExtractElement(self._raw, index._raw), self._context)
+    def ConstInsertElement(self, value, index):
+        return Value(_core.ConstInsertElement(self._raw, value._raw, index._raw), self._context)
+    def ConstShuffleVector(self, other, mask):
+        return Value(_core.ConstShuffleVector(self._raw, other._raw, index._raw), self._context)
+    def ConstExtractValue(self, indices):
+        n = len(indices)
+        raw_indices = (ctypes.c_uint * n)(*indices)
+        return Value(_core.ConstExtractValue(self._raw, raw_indices, n), self._context)
+    def ConstInsertValue(self, value, indices):
+        n = len(indices)
+        raw_indices = (ctypes.c_uint * n)(*indices)
+        return Value(_core.ConstInsertValue(self._raw, value._raw, raw_indices), self._context)
+
 class   BlockAddress(Constant):
     __slots__ = ()
+    def __new__(cls, fv, bb):
+        return Value(_core.BlockAddress(fv._raw, bb._raw_bb), fv._context)
+
 
 class   ConstantAggregateZero(Constant):
     __slots__ = ()
@@ -721,12 +1100,121 @@ class   ConstantArray(Constant):
 
 class   ConstantExpr(Constant):
     __slots__ = ()
+    _subclasses = {}
+    @staticmethod
+    def _figure_out(value):
+        # value is a _core.Value that is a ConstantExpr
+        return ConstantExpr
+
+    def GetConstOpcode(self):
+        return _core.GetConstOpcode(self._raw)
+ConstantExpr._subclasses[Opcode.Ret] = None
+ConstantExpr._subclasses[Opcode.Br] = None
+ConstantExpr._subclasses[Opcode.Switch] = None
+ConstantExpr._subclasses[Opcode.IndirectBr] = None
+ConstantExpr._subclasses[Opcode.Invoke] = None
+ConstantExpr._subclasses[Opcode.Unreachable] = None
+class    BinaryConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.Add] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.FAdd] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.Sub] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.FSub] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.Mul] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.FMul] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.UDiv] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.SDiv] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.FDiv] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.URem] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.SRem] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.FRem] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.Shl] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.LShr] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.AShr] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.And] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.Or] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.Xor] = BinaryConstantExpr
+ConstantExpr._subclasses[Opcode.Alloca] = None
+ConstantExpr._subclasses[Opcode.Load] = None
+ConstantExpr._subclasses[Opcode.Store] = None
+class    GetElementPtrConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.GetElementPtr] = GetElementPtrConstantExpr
+# not used for normal unary things
+class    UnaryConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.Trunc] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.ZExt] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.SExt] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.FPToUI] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.FPToSI] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.UIToFP] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.SIToFP] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.FPTrunc] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.FPExt] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.PtrToInt] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.IntToPtr] = UnaryConstantExpr
+ConstantExpr._subclasses[Opcode.BitCast] = UnaryConstantExpr
+class    CompareConstantExpr(ConstantExpr):
+    __slots__ = ()
+class AnyICmp(Value):
+    ''' Mixin for ICmpConstantExpr and ICmpInst
+    '''
+    __slots__ = ()
+    def GetICmpPredicate(self):
+        ''' Obtain the predicate of an instruction.
+
+            This is only valid for Opcode.ICmp
+        '''
+        return _core.GetICmpPredicate(self._raw)
+class     ICmpConstantExpr(CompareConstantExpr, AnyICmp):
+    __slots__ = ()
+
+ConstantExpr._subclasses[Opcode.ICmp] = ICmpConstantExpr
+class     FCmpConstantExpr(CompareConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.FCmp] = FCmpConstantExpr
+ConstantExpr._subclasses[Opcode.PHI] = None
+ConstantExpr._subclasses[Opcode.Call] = None
+class    SelectConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.Select] = SelectConstantExpr
+# ??
+ConstantExpr._subclasses[Opcode.UserOp1] = None
+ConstantExpr._subclasses[Opcode.UserOp2] = None
+ConstantExpr._subclasses[Opcode.VAArg] = None
+class    ExtractElementConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.ExtractElement] = ExtractElementConstantExpr
+class    InsertElementConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.InsertElement] = InsertElementConstantExpr
+class    ShuffleVectorConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.ShuffleVector] = ShuffleVectorConstantExpr
+class    ExtractValueConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.ExtractValue] = ExtractValueConstantExpr
+class    InsertValueConstantExpr(ConstantExpr):
+    __slots__ = ()
+ConstantExpr._subclasses[Opcode.InsertValue] = InsertValueConstantExpr
+ConstantExpr._subclasses[Opcode.Fence] = None
+ConstantExpr._subclasses[Opcode.AtomicCmpXchg] = None
+ConstantExpr._subclasses[Opcode.AtomicRMW] = None
+ConstantExpr._subclasses[Opcode.Resume] = None
+ConstantExpr._subclasses[Opcode.LandingPad] = None
+
 
 class   ConstantFP(Constant):
     __slots__ = ()
 
 class   ConstantInt(Constant):
     __slots__ = ()
+
+    def GetZExtValue(self):
+        return _core.ConstIntGetZExtValue(self._raw)
+    def GetSExtValue(self):
+        return _core.ConstIntGetSExtValue(self._raw)
 
 class   ConstantPointerNull(Constant):
     __slots__ = ()
@@ -740,6 +1228,32 @@ class   ConstantVector(Constant):
 class   GlobalValue(Constant):
     __slots__ = ()
 
+    # Can't enable because Module is not cached.
+    # Haven't cached because it would cause issues.
+    # I'm also not convinced this is very useful.
+    #def GetGlobalParent(self):
+    #    return _core.GetGlobalParent(self)
+
+    def IsDeclaration(self):
+        return bool(_core.IsDeclaration(self._raw))
+    def GetLinkage(self):
+        return _core.GetLinkage(self._raw)
+    def SetLinkage(self, linkage):
+        _core.SetLinkage(self._raw, linkage)
+    def GetSection(self):
+        return b2u(_core.GetSection(self._raw))
+    def SetSection(self, name):
+        _core.SetSection(self._raw, u2b(name))
+    def GetVisibility(self):
+        return _core.GetVisibility(self._raw)
+    def SetVisibility(self, viz):
+        _core.SetVisibility(self.raw, viz)
+    def GetAlignment(self):
+        return _core.GetAlignment(self._raw)
+    def SetAlignment(self, align):
+        _core.SetAlignment(self._raw, align)
+
+
 class    Function(GlobalValue):
     __slots__ = ()
 
@@ -749,7 +1263,7 @@ class    Function(GlobalValue):
             Returns None if the iterator was already at the end and
             there are no more functions.
         '''
-        return Value(_core.GetNextFunction(self._raw))
+        return Value(_core.GetNextFunction(self._raw), self._context)
 
     def GetPreviousFunction(self):
         ''' Decrement a Function iterator to the previous Function.
@@ -757,25 +1271,231 @@ class    Function(GlobalValue):
             Returns None if the iterator was already at the beginning
             and there are no previous functions.
         '''
-        return Value(_core.GetPreviousFunction(self._raw))
+        return Value(_core.GetPreviousFunction(self._raw), self._context)
+
+    def DeleteFunction(self):
+        ''' Remove a function from its containing module and deletes it.
+        '''
+        _core.DeleteFunction(self._raw)
+
+    def GetIntrinsicID(self):
+        ''' Obtain the ID number from a function instance.
+        '''
+        return _core.LLVMGetIntrinsicID(self._raw)
+
+    def GetFunctionCallConv(self):
+        ''' Obtain the calling convention of a function.
+        '''
+        return _core.LLVMGetFunctionCallConv(self._raw)
+    def SetFunctionCallConv(self, cc):
+        ''' Set the calling convention of a function.
+        '''
+        _core.LLVMSetFunctionCallConv(self._raw, cc)
+
+    def GetGC(self):
+        ''' Obtain the name of the garbage collector to use during code
+            generation.
+        '''
+        return b2u(_core.GetGC(self._raw))
+    def SetGC(self, gc):
+        ''' Define the garbage collector to use during code generation.
+        '''
+        _core.LLVMSetGC(self._raw, u2b(gc))
+
+    def AddFunctionAttr(self, attr):
+        ''' Add an attribute to a function.
+        '''
+        _core.LLVMAddFunctionAttr(self._raw, attr)
+    def GetFunctionAttr(self):
+        ''' Obtain an attribute from a function.
+        '''
+        return _core.LLVMGetFunctionAttr(self._raw)
+    def RemoveFunctionAttr(self, attr):
+        ''' Remove an attribute from a function.
+        '''
+        _core.RemoveFunctionAttr(self._raw, attr)
+
+    def CountParams(self):
+        ''' Obtain the number of parameters in a function.
+        '''
+        return _core.CountParams(self._raw)
+
+    def GetParams(self):
+        ''' Obtain the parameters in a function.
+
+            Returns a python list of Argument instances.
+        '''
+        n = self.CountParams()
+        if not n:
+            return []
+        raw_out = (_core.Value * n)()
+        _core.GetParams(self._raw, ctypes.byref(raw_out))
+        context = self._context
+        return [Value(i, context) for i in raw_out]
+    def GetParam(self, index):
+        ''' Obtain the parameter at the specified index.
+
+            Parameters are indexed from 0.
+        '''
+        return Value(_core.GetParam(self._raw, index), self._context)
+
+    # not sure it's actually worth exposing anything besides GetParams
+    def GetFirstParam(self):
+        ''' Obtain the first parameter to a function.
+        '''
+        return Value(_core.GetFirstParam(self._raw), self._context)
+    def GetLastParam(self):
+        ''' Obtain the last parameter to a function.
+        '''
+        return Value(_core.GetLastParam(self._raw), self._context)
+
+
+    def CountBasicBlocks(self):
+        ''' Obtain the number of basic blocks in a function.
+        '''
+        return _core.CountBasicBlocks(self._raw)
+    def GetBasicBlocks(self):
+        ''' Obtain all of the basic blocks in a function.
+
+            Returns a python list.
+        '''
+        n = self.CountBasicBlocks()
+        if not n:
+            return []
+        raw_out = (_core.BasicBlock * n)()
+        _core.GetBasicBlocks(self._raw, ctypes.byref(raw_out))
+        context = self._context
+        return [Value(_core.BasicBlockAsValue(i), context) for i in raw_out]
+    def GetFirstBasicBlock(self):
+        ''' Obtain the first basic block in a function.
+
+            The returned basic block can be used as an iterator. You will
+            likely eventually call into LLVMGetNextBasicBlock() with it.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.GetFirstBasicBlock(self._raw)), self._context)
+    def GetLastBasicBlock(self):
+        ''' Obtain the last basic block in a function.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.GetLastBasicBlock(self._raw)), self._context)
+    def GetEntryBasicBlock(self):
+        ''' Obtain the basic block that corresponds to the entry point of a
+            function.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.GetEntryBasicBlock(self._raw)), self._context)
+
+    def AppendBasicBlock(self, name):
+        ''' Append a basic block to the end of a function.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.AppendBasicBlockInContext(self._context._raw, self._raw, u2b(name))), self._context)
 
 class    GlobalAlias(GlobalValue):
     __slots__ = ()
 
 class    GlobalVariable(GlobalValue):
     __slots__ = ()
+    def GetNextGlobal(self):
+        return Value(_core.GetNextGlobal(self._raw), self._context)
+    def GetPreviousGlobal(self):
+        return Value(_core.GetPreviousGlobal(self._raw), self._context)
+
+    def DeleteGlobal(self):
+        _core.DeleteGlobal(self._raw)
+    def GetInitializer(self):
+        return Value(_core.GetInitializer(self._raw), self._context)
+    def SetInitializer(self, val):
+        _core.SetInitializer(self._raw, val._raw)
+    def IsThreadLocal(self):
+        return bool(_core.IsThreadLocal(self._raw))
+    def SetThreadLocal(self, is_tl):
+        _core.SetThreadLocal(self._raw, is_tl)
+    def IsConstant(self):
+        return bool(_core.IsGlobalConstant(self._raw))
+    def SetConstant(self, is_c):
+        _core.SetGlobalConstant(self._raw, is_c)
 
 class   UndefValue(Constant):
     __slots__ = ()
 
 class  Instruction(User):
     __slots__ = ()
+    def HasMetadata(self):
+        ''' Determine whether an instruction has any metadata attached.
+        '''
+        return bool(_core.HasMetadata(self._raw))
+    def GetMetadata(self, kind_id):
+        ''' Return metadata associated with an instruction value.
+        '''
+        return Value(_core.GetMetadata([Value, ctypes.c_uint]), self._context)
+    def SetMetadata(self, kind_id, md):
+        ''' Set metadata associated with an instruction value.
+        '''
+        _core.SetMetadata([Value, ctypes.c_uint, Value])
+    def GetInstructionParent(self):
+        ''' Obtain the basic block to which an instruction belongs.
+        '''
+        return Value(_core.BasicBlockAsValue(_core.GetInstructionParent([Value])), self._context)
+    def GetNextInstruction(self):
+        ''' Obtain the instruction that occurs after the one specified.
+
+            The next instruction will be from the same basic block.
+
+            If this is the last instruction in a basic block, None will be
+            returned.
+        '''
+        return Value(_core.GetNextInstruction([Value]), self._context)
+    def GetPreviousInstruction(self):
+        ''' Obtain the instruction that occured before this one.
+
+            If the instruction is the first instruction in a basic block,
+            None will be returned.
+        '''
+        return Value(_core.GetPreviousInstruction([Value]), self._context)
+    def InstructionEraseFromParent(self):
+        ''' Remove and delete an instruction.
+
+            The instruction specified is removed from its containing
+            building block and then deleted.
+        '''
+        _core.InstructionEraseFromParent([Value])
+    def GetInstructionOpcode(self):
+        ''' Obtain the code Opcode for an individual instruction.
+        '''
+        return _core.GetInstructionOpcode([Value])
 
 class   BinaryOperator(Instruction):
     __slots__ = ()
 
-class   CallInst(Instruction):
+class AnyCallOrInvoke(Value):
+    ''' Mixin to treat CallInst and InvokeInst uniformly.
+
+        This corresponds roughly to llvm::CallSite.
+    '''
     __slots__ = ()
+    def SetInstructionCallConv(self, cc):
+        ''' Set the calling convention for a call instruction.
+        '''
+        _core.SetInstructionCallConv(self._raw, cc)
+    def GetInstructionCallConv(self):
+        ''' Obtain the calling convention for a call instruction.
+        '''
+        return _core.GetInstructionCallConv(self._raw)
+    def AddInstrAttribute(self, index, attr):
+        _core.AddInstrAttribute(self._raw, index, attr)
+    def RemoveInstrAttribute(self, index, attr):
+        _core.RemoveInstrAttribute(self._raw, index, attr)
+    def SetInstrParamAlignment(self, index, align):
+        _core.SetInstrParamAlignment(self._raw, index, align)
+
+class   CallInst(Instruction, AnyCallOrInvoke):
+    __slots__ = ()
+    def IsTailCall(self):
+        ''' Obtain whether a call instruction is a tail call.
+        '''
+        return bool(_core.IsTailCall(self._raw))
+    def SetTailCall(self, is_tc):
+        ''' Set whether a call instruction is a tail call.
+        '''
+        _core.SetTailCall(self._raw, is_tc)
 
 class    IntrinsicInst(CallInst):
     __slots__ = ()
@@ -806,6 +1526,11 @@ class    FCmpInst(CmpInst):
 
 class    ICmpInst(CmpInst):
     __slots__ = ()
+    def GetICmpPredicate(self):
+        ''' Obtain the predicate of an instruction.
+        '''
+        # also done for some ConstantExpr
+        return _core.GetICmpPredicate(self._raw)
 
 class   ExtractElementInst(Instruction):
     __slots__ = ()
@@ -821,9 +1546,33 @@ class   InsertValueInst(Instruction):
 
 class   LandingPadInst(Instruction):
     __slots__ = ()
+    def AddClause(self, clause_val):
+        _core.AddClause(self._raw, clause_val._raw)
+    def SetCleanup(self, v):
+        _core.SetCleanup(self._raw, v)
 
 class   PHINode(Instruction):
     __slots__ = ()
+    def AddIncoming(self, values, blocks):
+        ''' Add incoming values to the end of a PHI list.
+        '''
+        n = len(values)
+        assert n == len(blocks)
+        raw_values = (_core.Value * n)(*[i._raw for i in values])
+        raw_blocks = (_core.BasicBlock * n)(*[i._raw_bb for i in blocks])
+        _core.AddIncoming(self._raw, raw_values, raw_blocks, n)
+    def CountIncoming(self):
+        ''' Obtain the number of incoming basic blocks to a PHI node.
+        '''
+        return _core.CountIncoming(self._raw)
+    def GetIncomingValue(self, index):
+        ''' Obtain an incoming value to a PHI node as a LLVMValueRef.
+        '''
+        return Value(GetIncomingValue(self._raw, index), self._context)
+    def GetIncomingBlock(self, index):
+        ''' Obtain an incoming value to a PHI node as a LLVMBasicBlockRef.
+        '''
+        return Value(_core.BasicBlockAsValue(GetIncomingBlock(self._raw, index)), self._context)
 
 class   SelectInst(Instruction):
     __slots__ = ()
@@ -831,7 +1580,14 @@ class   SelectInst(Instruction):
 class   ShuffleVectorInst(Instruction):
     __slots__ = ()
 
-class   StoreInst(Instruction):
+class AnyMemAccessInst(Value):
+    __slots__ = ()
+    def GetVolatile(self):
+        return bool(_core.GetVolatile(self._raw))
+    def SetVolatile(self, vol):
+        _core.SetVolatile(self._raw, vol)
+
+class   StoreInst(Instruction, AnyMemAccessInst):
     __slots__ = ()
 
 class   TerminatorInst(Instruction):
@@ -842,15 +1598,31 @@ class    BranchInst(TerminatorInst):
 
 class    IndirectBrInst(TerminatorInst):
     __slots__ = ()
+    def AddDestination(self):
+        _core.AddDestination(self._raw, dest._raw_bb)
 
-class    InvokeInst(TerminatorInst):
+class    InvokeInst(TerminatorInst, AnyCallOrInvoke):
     __slots__ = ()
+    def SetInstructionCallConv(self, cc):
+        ''' Set the calling convention for a call instruction.
+        '''
+        # also in CallInst
+        _core.SetInstructionCallConv(self._raw, cc)
+    def GetInstructionCallConv(self):
+        ''' Obtain the calling convention for a call instruction.
+        '''
+        # also in CallInst
+        return _core.GetInstructionCallConv(self._raw)
 
 class    ReturnInst(TerminatorInst):
     __slots__ = ()
 
 class    SwitchInst(TerminatorInst):
     __slots__ = ()
+    def GetSwitchDefaultDest(self):
+        return Value(_core.BasicBlockAsValue(_core.GetSwitchDefaultDest(self._raw)), self._context)
+    def AddCase(self, onval, dest):
+        _core.AddCase(self._raw, onval._raw, dest._raw_bb)
 
 class    UnreachableInst(TerminatorInst):
     __slots__ = ()
@@ -906,457 +1678,402 @@ class     ZExtInst(CastInst):
 class    ExtractValueInst(UnaryInstruction):
     __slots__ = ()
 
-class    LoadInst(UnaryInstruction):
+class    LoadInst(UnaryInstruction, AnyMemAccessInst):
     __slots__ = ()
 
 class    VAArgInst(UnaryInstruction):
     __slots__ = ()
 
-if 0:
-    class IRBuilder:
-        __slots__ = ('_raw',)
-        def __init__(self, raw):
-            assert isinstance(raw, _core.Builder)
-            self._raw = raw
-    class ModuleProvider:
-        __slots__ = ('_raw',)
-        def __init__(self, raw):
-            assert isinstance(raw, _core.ModuleProvider)
-            self._raw = raw
-    class MemoryBuffer:
-        __slots__ = ('_raw',)
-        def __init__(self, raw):
-            assert isinstance(raw, _core.MemoryBuffer)
-            self._raw = raw
-    class PassManager:
-        __slots__ = ('_raw',)
-        def __init__(self, raw):
-            assert isinstance(raw, _core.PassManager)
-            self._raw = raw
-    class PassRegistry:
-        __slots__ = ('_raw',)
-        def __init__(self, raw):
-            assert isinstance(raw, _core.PassRegistry)
-            self._raw = raw
-    class Use:
-        __slots__ = ('_raw',)
-        def __init__(self, raw):
-            assert isinstance(raw, _core.Use)
-            self._raw = raw
 
 
+class Use:
+    ''' Is it even worth exposing this in the public API?
+        A mere iterable-of-values might suffice ...
+    '''
+    __slots__ = ('_raw', '_context')
+    def __new__(cls, raw, context):
+        assert isinstance(raw, _core.Use)
+        assert isinstance(context, Context)
+        assert cls == Use
+        if not raw:
+            return None
+        # No cache implemented ...
+        self = object.__new__(Use)
+        self._raw = raw
+        self._context = context
+        return self
+
+    def GetNextUse(self):
+        ''' Obtain the next use of a value.
+
+            This effectively advances the iterator. It returns NULL if
+            you are on the final use and no more are available.
+        '''
+        return Use(_core.GetNextUse(self._raw))
+
+    def GetUser(self):
+        ''' Obtain the user value for a user.
+        '''
+        return Value(_core.GetUser(self._raw), self._context)
+
+    def GetUsedValue(self):
+        ''' Obtain the value this use corresponds to.
+        '''
+        return Value(_core.GetUsedValue(self._raw), self._context)
 
 
-    IsAArgument = _library.function(Value, 'LLVMIsAArgument', [Value])
-    IsABasicBlock = _library.function(Value, 'LLVMIsABasicBlock', [Value])
-    IsAInlineAsm = _library.function(Value, 'LLVMIsAInlineAsm', [Value])
-    IsAMDNode = _library.function(Value, 'LLVMIsAMDNode', [Value])
-    IsAMDString = _library.function(Value, 'LLVMIsAMDString', [Value])
-    IsAUser = _library.function(Value, 'LLVMIsAUser', [Value])
-    IsAConstant = _library.function(Value, 'LLVMIsAConstant', [Value])
-    IsABlockAddress = _library.function(Value, 'LLVMIsABlockAddress', [Value])
-    IsAConstantAggregateZero = _library.function(Value, 'LLVMIsAConstantAggregateZero', [Value])
-    IsAConstantArray = _library.function(Value, 'LLVMIsAConstantArray', [Value])
-    IsAConstantExpr = _library.function(Value, 'LLVMIsAConstantExpr', [Value])
-    IsAConstantFP = _library.function(Value, 'LLVMIsAConstantFP', [Value])
-    IsAConstantInt = _library.function(Value, 'LLVMIsAConstantInt', [Value])
-    IsAConstantPointerNull = _library.function(Value, 'LLVMIsAConstantPointerNull', [Value])
-    IsAConstantStruct = _library.function(Value, 'LLVMIsAConstantStruct', [Value])
-    IsAConstantVector = _library.function(Value, 'LLVMIsAConstantVector', [Value])
-    IsAGlobalValue = _library.function(Value, 'LLVMIsAGlobalValue', [Value])
-    IsAFunction = _library.function(Value, 'LLVMIsAFunction', [Value])
-    IsAGlobalAlias = _library.function(Value, 'LLVMIsAGlobalAlias', [Value])
-    IsAGlobalVariable = _library.function(Value, 'LLVMIsAGlobalVariable', [Value])
-    IsAUndefValue = _library.function(Value, 'LLVMIsAUndefValue', [Value])
-    IsAInstruction = _library.function(Value, 'LLVMIsAInstruction', [Value])
-    IsABinaryOperator = _library.function(Value, 'LLVMIsABinaryOperator', [Value])
-    IsACallInst = _library.function(Value, 'LLVMIsACallInst', [Value])
-    IsAIntrinsicInst = _library.function(Value, 'LLVMIsAIntrinsicInst', [Value])
-    IsADbgInfoIntrinsic = _library.function(Value, 'LLVMIsADbgInfoIntrinsic', [Value])
-    IsADbgDeclareInst = _library.function(Value, 'LLVMIsADbgDeclareInst', [Value])
-    IsAMemIntrinsic = _library.function(Value, 'LLVMIsAMemIntrinsic', [Value])
-    IsAMemCpyInst = _library.function(Value, 'LLVMIsAMemCpyInst', [Value])
-    IsAMemMoveInst = _library.function(Value, 'LLVMIsAMemMoveInst', [Value])
-    IsAMemSetInst = _library.function(Value, 'LLVMIsAMemSetInst', [Value])
-    IsACmpInst = _library.function(Value, 'LLVMIsACmpInst', [Value])
-    IsAFCmpInst = _library.function(Value, 'LLVMIsAFCmpInst', [Value])
-    IsAICmpInst = _library.function(Value, 'LLVMIsAICmpInst', [Value])
-    IsAExtractElementInst = _library.function(Value, 'LLVMIsAExtractElementInst', [Value])
-    IsAGetElementPtrInst = _library.function(Value, 'LLVMIsAGetElementPtrInst', [Value])
-    IsAInsertElementInst = _library.function(Value, 'LLVMIsAInsertElementInst', [Value])
-    IsAInsertValueInst = _library.function(Value, 'LLVMIsAInsertValueInst', [Value])
-    IsALandingPadInst = _library.function(Value, 'LLVMIsALandingPadInst', [Value])
-    IsAPHINode = _library.function(Value, 'LLVMIsAPHINode', [Value])
-    IsASelectInst = _library.function(Value, 'LLVMIsASelectInst', [Value])
-    IsAShuffleVectorInst = _library.function(Value, 'LLVMIsAShuffleVectorInst', [Value])
-    IsAStoreInst = _library.function(Value, 'LLVMIsAStoreInst', [Value])
-    IsATerminatorInst = _library.function(Value, 'LLVMIsATerminatorInst', [Value])
-    IsABranchInst = _library.function(Value, 'LLVMIsABranchInst', [Value])
-    IsAIndirectBrInst = _library.function(Value, 'LLVMIsAIndirectBrInst', [Value])
-    IsAInvokeInst = _library.function(Value, 'LLVMIsAInvokeInst', [Value])
-    IsAReturnInst = _library.function(Value, 'LLVMIsAReturnInst', [Value])
-    IsASwitchInst = _library.function(Value, 'LLVMIsASwitchInst', [Value])
-    IsAUnreachableInst = _library.function(Value, 'LLVMIsAUnreachableInst', [Value])
-    IsAResumeInst = _library.function(Value, 'LLVMIsAResumeInst', [Value])
-    IsAUnaryInstruction = _library.function(Value, 'LLVMIsAUnaryInstruction', [Value])
-    IsAAllocaInst = _library.function(Value, 'LLVMIsAAllocaInst', [Value])
-    IsACastInst = _library.function(Value, 'LLVMIsACastInst', [Value])
-    IsABitCastInst = _library.function(Value, 'LLVMIsABitCastInst', [Value])
-    IsAFPExtInst = _library.function(Value, 'LLVMIsAFPExtInst', [Value])
-    IsAFPToSIInst = _library.function(Value, 'LLVMIsAFPToSIInst', [Value])
-    IsAFPToUIInst = _library.function(Value, 'LLVMIsAFPToUIInst', [Value])
-    IsAFPTruncInst = _library.function(Value, 'LLVMIsAFPTruncInst', [Value])
-    IsAIntToPtrInst = _library.function(Value, 'LLVMIsAIntToPtrInst', [Value])
-    IsAPtrToIntInst = _library.function(Value, 'LLVMIsAPtrToIntInst', [Value])
-    IsASExtInst = _library.function(Value, 'LLVMIsASExtInst', [Value])
-    IsASIToFPInst = _library.function(Value, 'LLVMIsASIToFPInst', [Value])
-    IsATruncInst = _library.function(Value, 'LLVMIsATruncInst', [Value])
-    IsAUIToFPInst = _library.function(Value, 'LLVMIsAUIToFPInst', [Value])
-    IsAZExtInst = _library.function(Value, 'LLVMIsAZExtInst', [Value])
-    IsAExtractValueInst = _library.function(Value, 'LLVMIsAExtractValueInst', [Value])
-    IsALoadInst = _library.function(Value, 'LLVMIsALoadInst', [Value])
-    IsAVAArgInst = _library.function(Value, 'LLVMIsAVAArgInst', [Value])
+def ConstVector(values):
+    ''' Create a ConstantVector from values.
+    '''
+    n = len(values)
+    assert n
+    raw_values = (_core.Value * n)(*[i._raw for i in values])
+    return Value(_core.ConstVector(raw_values, n), values[0]._context)
 
+class IRBuilder:
+    __slots__ = ('_raw', '_context')
 
-    GetFirstUse = _library.function(Use, 'LLVMGetFirstUse', [Value])
-    GetNextUse = _library.function(Use, 'LLVMGetNextUse', [Use])
-    GetUser = _library.function(Value, 'LLVMGetUser', [Use])
-    GetUsedValue = _library.function(Value, 'LLVMGetUsedValue', [Use])
+    def __init__(self, context):
+        self._raw = _core.CreateBuilderInContext(context._raw)
+        self._context = context
 
+    def __del__(self):
+        _core.DisposeBuilder(self._raw)
 
-    GetOperand = _library.function(Value, 'LLVMGetOperand', [Value, ctypes.c_uint])
-    SetOperand = _library.function(None, 'LLVMSetOperand', [Value, ctypes.c_uint, Value])
-    GetNumOperands = _library.function(ctypes.c_int, 'LLVMGetNumOperands', [Value])
+    def PositionBuilder(self, block, instr):
+        _core.PositionBuilder(self._raw, block._raw_bb, instr._raw)
+    def PositionBuilderBefore(self, instr):
+        _core.PositionBuilderBefore(self._raw, instr._raw)
+    def PositionBuilderAtEnd(self, block):
+        _core.PositionBuilderAtEnd(self._raw, block._raw_bb)
+    def GetInsertBlock(self):
+        return Value(_core.BasicBlockAsValue(_core.GetInsertBlock(self._raw)), self._context)
+    def ClearInsertionPosition(self):
+        _core.ClearInsertionPosition(self._raw)
+    def InsertIntoBuilderWithName(self, instr, name=None):
+        if name is None:
+            _core.InsertIntoBuilder(self._raw. instr._raw)
+        else:
+            _core.InsertIntoBuilderWithName(self._raw, instr._raw, u2b(name))
 
+    # Metadata
+    def SetCurrentDebugLocation(self, l):
+        _core.SetCurrentDebugLocation(self._raw, l._raw)
+    def GetCurrentDebugLocation(self):
+        return _core.GetCurrentDebugLocation(self._raw)
+    def SetInstDebugLocation(self, inst):
+        _core.SetInstDebugLocation(self._raw, inst._raw)
 
-    ConstNull = _library.function(Value, 'LLVMConstNull', [Type])
-    ConstAllOnes = _library.function(Value, 'LLVMConstAllOnes', [Type])
-    GetUndef = _library.function(Value, 'LLVMGetUndef', [Type])
-    IsNull = _library.function(Bool, 'LLVMIsNull', [Value])
-    ConstPointerNull = _library.function(Value, 'LLVMConstPointerNull', [Type])
+    # Terminators
+    def BuildRetVoid(self):
+        return Value(_core.BuildRetVoid(self._raw), self._context)
+    def BuildRet(self, v):
+        return Value(_core.BuildRet(self._raw, v._raw), self._context)
+    def BuildAggregateRet(self, values):
+        n = len(values)
+        raw_values = (_core.Value * n)(*[i._raw for i in values])
+        return Value(_core.BuildAggregateRet(self._raw, raw_values, n), self._context)
+    def BuildBr(self, dest):
+        return Value(_core.BuildBr(self._raw, dest._raw_bb), self._context)
+    def BuildCondBr(self, if_, then, else_):
+        return Value(_core.BuildCondBr(self._raw, if_._raw, then._raw_bb, else_._raw_bb), self._context)
+    def BuildSwitch(self, v, else_, n):
+        return Value(_core.BuildSwitch(self._raw, v._raw, else_._raw_bb, n), self._context)
+    def BuildIndirectBr(self, addr, n):
+        return Value(_core.BuildIndirectBr(self._raw, addr._raw, n), self._context)
+    def BuildInvoke(self, fn, args, then, catch, name):
+        n = len(args)
+        raw_args = (_core.Value * n)(*[i._raw for i in args])
+        return Value(_core.BuildInvoke(self._raw, fn._raw, raw_args, n, then._raw_bb, catch._raw_bb, u2b(name)), self._context)
+    def BuildLandingPad(self, ty, persfn, n, name):
+        return Value(_core.BuildLandingPad(self._raw, ty._raw, persfn._raw, n, u2b(name)), self._context)
+    def BuildResume(self, exn):
+        return Value(_core.BuildResume(self._raw, exn._raw), self._context)
+    def BuildUnreachable(self):
+        return Value(_core.BuildUnreachable(self._raw), self._context)
 
-    ConstInt = _library.function(Value, 'LLVMConstInt', [Type, ctypes.c_ulonglong, Bool])
-    ConstIntOfArbitraryPrecision = _library.function(Value, 'LLVMConstIntOfArbitraryPrecision', [Type, ctypes.c_uint, ctypes.POINTER(ctypes.c_uint64)])
-    ConstIntOfString = _library.function(Value, 'LLVMConstIntOfString', [Type, ctypes.c_char_p, ctypes.c_uint8])
-    ConstIntOfStringAndSize = _library.function(Value, 'LLVMConstIntOfStringAndSize', [Type, ctypes.c_char_p, ctypes.c_uint, ctypes.c_uint8])
-    ConstReal = _library.function(Value, 'LLVMConstReal', [Type, ctypes.c_double])
-    ConstRealOfString = _library.function(Value, 'LLVMConstRealOfString', [Type, ctypes.c_char_p])
-    ConstRealOfStringAndSize = _library.function(Value, 'LLVMConstRealOfStringAndSize', [Type, ctypes.c_char_p, ctypes.c_uint])
-    ConstIntGetZExtValue = _library.function(ctypes.c_ulonglong, 'LLVMConstIntGetZExtValue', [Value])
-    ConstIntGetSExtValue = _library.function(ctypes.c_longlong, 'LLVMConstIntGetSExtValue', [Value])
+    # Arithmetic
+    def BuildAdd(self, lhs, rhs, name):
+        return Value(_core.BuildAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNSWAdd(self, lhs, rhs, name):
+        return Value(_core.BuildNSWAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNUWAdd(self, lhs, rhs, name):
+        return Value(_core.BuildNUWAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildFAdd(self, lhs, rhs, name):
+        return Value(_core.BuildFAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildSub(self, lhs, rhs, name):
+        return Value(_core.BuildSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNSWSub(self, lhs, rhs, name):
+        return Value(_core.BuildNSWSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNUWSub(self, lhs, rhs, name):
+        return Value(_core.BuildNUWSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildFSub(self, lhs, rhs, name):
+        return Value(_core.BuildFSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildMul(self, lhs, rhs, name):
+        return Value(_core.BuildMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNSWMul(self, lhs, rhs, name):
+        return Value(_core.BuildNSWMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNUWMul(self, lhs, rhs, name):
+        return Value(_core.BuildNUWMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildFMul(self, lhs, rhs, name):
+        return Value(_core.BuildFMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildUDiv(self, lhs, rhs, name):
+        return Value(_core.BuildUDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildSDiv(self, lhs, rhs, name):
+        return Value(_core.BuildSDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildExactSDiv(self, lhs, rhs, name):
+        return Value(_core.BuildExactSDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildFDiv(self, lhs, rhs, name):
+        return Value(_core.BuildFDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildURem(self, lhs, rhs, name):
+        return Value(_core.BuildURem(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildSRem(self, lhs, rhs, name):
+        return Value(_core.BuildSRem(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildFRem(self, lhs, rhs, name):
+        return Value(_core.BuildFRem(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildShl(self, lhs, rhs, name):
+        return Value(_core.BuildShl(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildLShr(self, lhs, rhs, name):
+        return Value(_core.BuildLShr(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildAShr(self, lhs, rhs, name):
+        return Value(_core.BuildAShr(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildAnd(self, lhs, rhs, name):
+        return Value(_core.BuildAnd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildOr(self, lhs, rhs, name):
+        return Value(_core.BuildOr(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildXor(self, lhs, rhs, name):
+        return Value(_core.BuildXor(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildBinOp(self, op, lhs, rhs, name):
+        return Value(_core.BuildBinOp(self._raw, op, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNeg(self, rhs, name):
+        return Value(_core.BuildNeg(self._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNSWNeg(self, rhs, name):
+        return Value(_core.BuildNSWNeg(self._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNUWNeg(self, rhs, name):
+        return Value(_core.BuildNUWNeg(self._raw, rhs._raw, u2b(name)), self._context)
+    def BuildFNeg(self, rhs, name):
+        return Value(_core.BuildFNeg(self._raw, rhs._raw, u2b(name)), self._context)
+    def BuildNot(self, rhs, name):
+        return Value(_core.BuildNot(self._raw, rhs._raw, u2b(name)), self._context)
 
-    ConstStringInContext = _library.function(Value, 'LLVMConstStringInContext', [Context, ctypes.c_char_p, ctypes.c_uint, Bool])
-    ConstString = _library.function(Value, 'LLVMConstString', [ctypes.c_char_p, ctypes.c_uint, Bool])
-    ConstStructInContext = _library.function(Value, 'LLVMConstStructInContext', [Context, ctypes.POINTER(Value), ctypes.c_uint, Bool])
-    ConstStruct = _library.function(Value, 'LLVMConstStruct', [ctypes.POINTER(Value), ctypes.c_uint, Bool])
-    ConstArray = _library.function(Value, 'LLVMConstArray', [Type, ctypes.POINTER(Value), ctypes.c_uint])
-    ConstNamedStruct = _library.function(Value, 'LLVMConstNamedStruct', [Type, ctypes.POINTER(Value), ctypes.c_uint])
-    ConstVector = _library.function(Value, 'LLVMConstVector', [ctypes.POINTER(Value), ctypes.c_uint])
+    # Memory
+    def BuildMalloc(self, ty, name):
+        return Value(_core.BuildMalloc(self._raw, ty._raw, u2b(name)), self._context)
+    def BuildArrayMalloc(self, ty, val, name):
+        return Value(_core.BuildArrayMalloc(self._raw, ty._raw, val._raw, u2b(name)), self._context)
+    def BuildAlloca(self, ty, name):
+        return Value(_core.BuildAlloca(self._raw, ty._raw, u2b(name)), self._context)
+    def BuildArrayAlloca(self, ty, val, name):
+        return Value(_core.BuildArrayAlloca(self._raw, ty._raw, val._raw, u2b(name)), self._context)
+    def BuildFree(self, ptr):
+        return Value(_core.BuildFree(self._raw, ptr._raw), self._context)
+    def BuildLoad(self, ptr, name):
+        return Value(_core.BuildLoad(self._raw, ptr._raw, u2b(name)), self._context)
+    def BuildStore(self, val, ptr):
+        return Value(_core.BuildStore(self._raw, val._raw, ptr._raw), self._context)
+    def BuildGEP(self, ptr, indices, name):
+        n = len(indices)
+        raw_indices = (_core.Value * n)(*[i._raw for i in indices])
+        return Value(_core.BuildGEP(self._raw, ptr._raw, raw_indices, n, u2b(name)), self._context)
+    def BuildInBoundsGEP(self, ptr, indices, name):
+        n = len(indices)
+        raw_indices = (_core.Value * n)(*[i._raw for i in indices])
+        return Value(_core.BuildInBoundsGEP(self._raw, ptr._raw, raw_indices, n, u2b(name)), self._context)
+    def BuildStructGEP(self, ptr, index, name):
+        return Value(_core.BuildStructGEP(self._raw, ptr._raw, index, u2b(name)), self._context)
+    def BuildGlobalString(self, s, name):
+        return Value(_core.BuildGlobalString(self._raw, u2b(s), u2b(name)), self._context)
+    def BuildGlobalStringPtr(self, s, name):
+        return Value(_core.BuildGlobalStringPtr(self._raw, u2b(s), u2b(name)), self._context)
 
-    GetConstOpcode = _library.function(Opcode, 'LLVMGetConstOpcode', [Value])
-    AlignOf = _library.function(Value, 'LLVMAlignOf', [Type])
-    SizeOf = _library.function(Value, 'LLVMSizeOf', [Type])
-    ConstNeg = _library.function(Value, 'LLVMConstNeg', [Value])
-    ConstNSWNeg = _library.function(Value, 'LLVMConstNSWNeg', [Value])
-    ConstNUWNeg = _library.function(Value, 'LLVMConstNUWNeg', [Value])
-    ConstFNeg = _library.function(Value, 'LLVMConstFNeg', [Value])
-    ConstNot = _library.function(Value, 'LLVMConstNot', [Value])
-    ConstAdd = _library.function(Value, 'LLVMConstAdd', [Value, Value])
-    ConstNSWAdd = _library.function(Value, 'LLVMConstNSWAdd', [Value, Value])
-    ConstNUWAdd = _library.function(Value, 'LLVMConstNUWAdd', [Value, Value])
-    ConstFAdd = _library.function(Value, 'LLVMConstFAdd', [Value, Value])
-    ConstSub = _library.function(Value, 'LLVMConstSub', [Value, Value])
-    ConstNSWSub = _library.function(Value, 'LLVMConstNSWSub', [Value, Value])
-    ConstNUWSub = _library.function(Value, 'LLVMConstNUWSub', [Value, Value])
-    ConstFSub = _library.function(Value, 'LLVMConstFSub', [Value, Value])
-    ConstMul = _library.function(Value, 'LLVMConstMul', [Value, Value])
-    ConstNSWMul = _library.function(Value, 'LLVMConstNSWMul', [Value, Value])
-    ConstNUWMul = _library.function(Value, 'LLVMConstNUWMul', [Value, Value])
-    ConstFMul = _library.function(Value, 'LLVMConstFMul', [Value, Value])
-    ConstUDiv = _library.function(Value, 'LLVMConstUDiv', [Value, Value])
-    ConstSDiv = _library.function(Value, 'LLVMConstSDiv', [Value, Value])
-    ConstExactSDiv = _library.function(Value, 'LLVMConstExactSDiv', [Value, Value])
-    ConstFDiv = _library.function(Value, 'LLVMConstFDiv', [Value, Value])
-    ConstURem = _library.function(Value, 'LLVMConstURem', [Value, Value])
-    ConstSRem = _library.function(Value, 'LLVMConstSRem', [Value, Value])
-    ConstFRem = _library.function(Value, 'LLVMConstFRem', [Value, Value])
-    ConstAnd = _library.function(Value, 'LLVMConstAnd', [Value, Value])
-    ConstOr = _library.function(Value, 'LLVMConstOr', [Value, Value])
-    ConstXor = _library.function(Value, 'LLVMConstXor', [Value, Value])
-    ConstICmp = _library.function(Value, 'LLVMConstICmp', [IntPredicate, Value, Value])
-    ConstFCmp = _library.function(Value, 'LLVMConstFCmp', [RealPredicate, Value, Value])
-    ConstShl = _library.function(Value, 'LLVMConstShl', [Value, Value])
-    ConstLShr = _library.function(Value, 'LLVMConstLShr', [Value, Value])
-    ConstAShr = _library.function(Value, 'LLVMConstAShr', [Value, Value])
-    ConstGEP = _library.function(Value, 'LLVMConstGEP', [Value, ctypes.POINTER(Value), ctypes.c_uint])
-    ConstInBoundsGEP = _library.function(Value, 'LLVMConstInBoundsGEP', [Value, ctypes.POINTER(Value), ctypes.c_uint])
-    ConstTrunc = _library.function(Value, 'LLVMConstTrunc', [Value, Type])
-    ConstSExt = _library.function(Value, 'LLVMConstSExt', [Value, Type])
-    ConstZExt = _library.function(Value, 'LLVMConstZExt', [Value, Type])
-    ConstFPTrunc = _library.function(Value, 'LLVMConstFPTrunc', [Value, Type])
-    ConstFPExt = _library.function(Value, 'LLVMConstFPExt', [Value, Type])
-    ConstUIToFP = _library.function(Value, 'LLVMConstUIToFP', [Value, Type])
-    ConstSIToFP = _library.function(Value, 'LLVMConstSIToFP', [Value, Type])
-    ConstFPToUI = _library.function(Value, 'LLVMConstFPToUI', [Value, Type])
-    ConstFPToSI = _library.function(Value, 'LLVMConstFPToSI', [Value, Type])
-    ConstPtrToInt = _library.function(Value, 'LLVMConstPtrToInt', [Value, Type])
-    ConstIntToPtr = _library.function(Value, 'LLVMConstIntToPtr', [Value, Type])
-    ConstBitCast = _library.function(Value, 'LLVMConstBitCast', [Value, Type])
-    ConstZExtOrBitCast = _library.function(Value, 'LLVMConstZExtOrBitCast', [Value, Type])
-    ConstSExtOrBitCast = _library.function(Value, 'LLVMConstSExtOrBitCast', [Value, Type])
-    ConstTruncOrBitCast = _library.function(Value, 'LLVMConstTruncOrBitCast', [Value, Type])
-    ConstPointerCast = _library.function(Value, 'LLVMConstPointerCast', [Value, Type])
-    ConstIntCast = _library.function(Value, 'LLVMConstIntCast', [Value, Type, Bool])
-    ConstFPCast = _library.function(Value, 'LLVMConstFPCast', [Value, Type])
-    ConstSelect = _library.function(Value, 'LLVMConstSelect', [Value, Value, Value])
-    ConstExtractElement = _library.function(Value, 'LLVMConstExtractElement', [Value, Value])
-    ConstInsertElement = _library.function(Value, 'LLVMConstInsertElement', [Value, Value, Value])
-    ConstShuffleVector = _library.function(Value, 'LLVMConstShuffleVector', [Value, Value, Value])
-    ConstExtractValue = _library.function(Value, 'LLVMConstExtractValue', [Value, ctypes.POINTER(ctypes.c_uint), ctypes.c_uint])
-    ConstInsertValue = _library.function(Value, 'LLVMConstInsertValue', [Value, Value, ctypes.POINTER(ctypes.c_uint), ctypes.c_uint])
-    ConstInlineAsm = _library.function(Value, 'LLVMConstInlineAsm', [Type, ctypes.c_char_p, ctypes.c_char_p, Bool, Bool])
-    BlockAddress = _library.function(Value, 'LLVMBlockAddress', [Value, BasicBlock])
+    # Casts
+    def BuildTrunc(self, rhs, ty, name):
+        return Value(_core.BuildTrunc(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildZExt(self, rhs, ty, name):
+        return Value(_core.BuildZExt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildSExt(self, rhs, ty, name):
+        return Value(_core.BuildSExt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildFPToUI(self, rhs, ty, name):
+        return Value(_core.BuildFPToUI(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildFPToSI(self, rhs, ty, name):
+        return Value(_core.BuildFPToSI(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildUIToFP(self, rhs, ty, name):
+        return Value(_core.BuildUIToFP(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildSIToFP(self, rhs, ty, name):
+        return Value(_core.BuildSIToFP(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildFPTrunc(self, rhs, ty, name):
+        return Value(_core.BuildFPTrunc(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildFPExt(self, rhs, ty, name):
+        return Value(_core.BuildFPExt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildPtrToInt(self, rhs, ty, name):
+        return Value(_core.BuildPtrToInt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildIntToPtr(self, rhs, ty, name):
+        return Value(_core.BuildIntToPtr(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildBitCast(self, rhs, ty, name):
+        return Value(_core.BuildBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildZExtOrBitCast(self, rhs, ty, name):
+        return Value(_core.BuildZExtOrBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildSExtOrBitCast(self, rhs, ty, name):
+        return Value(_core.BuildSExtOrBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildTruncOrBitCast(self, rhs, ty, name):
+        return Value(_core.BuildTruncOrBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildCast(self, op, rhs, ty, name):
+        return Value(_core.BuildCast(self._raw, op. rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildPointerCast(self, rhs, ty, name):
+        return Value(_core.BuildPointerCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildIntCast(self, rhs, ty, name):
+        return Value(_core.BuildIntCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+    def BuildFPCast(self, rhs, ty, name):
+        return Value(_core.BuildFPCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
-    GetGlobalParent = _library.function(Module, 'LLVMGetGlobalParent', [Value])
-    IsDeclaration = _library.function(Bool, 'LLVMIsDeclaration', [Value])
-    GetLinkage = _library.function(Linkage, 'LLVMGetLinkage', [Value])
-    SetLinkage = _library.function(None, 'LLVMSetLinkage', [Value, Linkage])
-    GetSection = _library.function(ctypes.c_char_p, 'LLVMGetSection', [Value])
-    SetSection = _library.function(None, 'LLVMSetSection', [Value, ctypes.c_char_p])
-    GetVisibility = _library.function(Visibility, 'LLVMGetVisibility', [Value])
-    SetVisibility = _library.function(None, 'LLVMSetVisibility', [Value, Visibility])
-    GetAlignment = _library.function(ctypes.c_uint, 'LLVMGetAlignment', [Value])
-    SetAlignment = _library.function(None, 'LLVMSetAlignment', [Value, ctypes.c_uint])
+    # Comparisons
+    def BuildICmp(self, ipred, lhs, rhs, name):
+        return Value(_core.BuildICmp(self._raw, ipred, lhs._raw, rhs._raw, u2b(name)), self._context)
+    def BuildFCmp(self, rpred, lhs, rhs, name):
+        return Value(_core.BuildFCmp(self._raw, ipred, lhs._raw, rhs._raw, u2b(name)), self._context)
 
-    AddGlobal = _library.function(Value, 'LLVMAddGlobal', [Module, Type, ctypes.c_char_p])
-    AddGlobalInAddressSpace = _library.function(Value, 'LLVMAddGlobalInAddressSpace', [Module, Type,  ctypes.c_char_p, ctypes.c_uint])
-    GetNamedGlobal = _library.function(Value, 'LLVMGetNamedGlobal', [Module, ctypes.c_char_p])
-    GetFirstGlobal = _library.function(Value, 'LLVMGetFirstGlobal', [Module])
-    GetLastGlobal = _library.function(Value, 'LLVMGetLastGlobal', [Module])
-    GetNextGlobal = _library.function(Value, 'LLVMGetNextGlobal', [Value])
-    GetPreviousGlobal = _library.function(Value, 'LLVMGetPreviousGlobal', [Value])
-    DeleteGlobal = _library.function(None, 'LLVMDeleteGlobal', [Value])
-    GetInitializer = _library.function(Value, 'LLVMGetInitializer', [Value])
-    SetInitializer = _library.function(None, 'LLVMSetInitializer', [Value, Value])
-    IsThreadLocal = _library.function(Bool, 'LLVMIsThreadLocal', [Value])
-    SetThreadLocal = _library.function(None, 'LLVMSetThreadLocal', [Value, Bool])
-    IsGlobalConstant = _library.function(Bool, 'LLVMIsGlobalConstant', [Value])
-    SetGlobalConstant = _library.function(None, 'LLVMSetGlobalConstant', [Value, Bool])
+    # Miscellaneous instructions
+    def BuildPhi(self, ty, name):
+        return Value(_core.BuildPhi(self._raw, ty._raw, u2b(name)), self._context)
+    def BuildCall(self, fn, args, name):
+        n = len(args)
+        raw_args = (_core.Value * n)(*[i._raw for i in args])
+        return Value(_core.BuildCall(self._raw, fn._raw, raw_args, n, u2b(name)), self._context)
+    def BuildSelect(self, if_, then, else_, name):
+        return Value(_core.BuildSelect(self._raw, if_._raw, then._raw, else_._raw, u2b(name)), self._context)
+    def BuildVAArg(self, lst, ty, name):
+        return Value(_core.BuildVAArg(self._raw, lst._raw, ty._raw, u2b(name)), self._context)
+    def BuildExtractElement(self, vecval, index, name):
+        return Value(_core.BuildExtractElement(self._raw, vecval._raw, index._raw, u2b(name)), self._context)
+    def BuildInsertElement(self, vecval, eltval, index, name):
+        return Value(_core.BuildInsertElement(self._raw, vecval._raw, eltval._raw, index._raw, u2b(name)), self._context)
+    def BuildShuffleVector(self, v1, v2, mask, name):
+        return Value(_core.BuildShuffleVector(self._raw, v1._raw, v2._raw, mask._raw, u2b(name)), self._context)
+    def BuildExtractValue(self, aggval, index, name):
+        return Value(_core.BuildExtractValue(self._raw, aggval._raw, index, u2b(name)), self._context)
+    def BuildInsertValue(self, aggval, eltval, index, name):
+        return Value(_core.BuildInsertValue(self._raw, aggval._raw, eltval._raw, index, u2b(name)), self._context)
 
-    AddAlias = _library.function(Value, 'LLVMAddAlias', [Module, Type, Value, ctypes.c_char_p])
+    def BuildIsNull(self, val, name):
+        return Value(_core.BuildIsNull(self._raw, val._raw, u2b(name)), self._context)
+    def BuildIsNotNull(self, val, name):
+        return Value(_core.BuildIsNotNull(self._raw, val._raw, u2b(name)), self._context)
+    def BuildPtrDiff(self, lhs, rhs, name):
+        return Value(_core.BuildPtrDiff(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
-    DeleteFunction = _library.function(None, 'LLVMDeleteFunction', [Value])
-    GetIntrinsicID = _library.function(ctypes.c_uint, 'LLVMGetIntrinsicID', [Value])
-    GetFunctionCallConv = _library.function(ctypes.c_uint, 'LLVMGetFunctionCallConv', [Value])
-    SetFunctionCallConv = _library.function(None, 'LLVMSetFunctionCallConv', [Value, ctypes.c_uint])
-    GetGC = _library.function(ctypes.c_char_p, 'LLVMGetGC', [Value])
-    SetGC = _library.function(None, 'LLVMSetGC', [Value, ctypes.c_char_p])
-    AddFunctionAttr = _library.function(None, 'LLVMAddFunctionAttr', [Value, Attribute])
-    GetFunctionAttr = _library.function(Attribute, 'LLVMGetFunctionAttr', [Value])
-    RemoveFunctionAttr = _library.function(None, 'LLVMRemoveFunctionAttr', [Value, Attribute])
+class ModuleProvider:
+    __slots__ = ('_raw', '_mod')
+    def __init__(self, mod):
+        self._raw = _core.CreateModuleProviderForExistingModule(mod._raw)
+        self._mod = mod
+    # Something like this would have been necessary in LLVM 2.6,
+    # (along with removing ownership from the Module),
+    # but I'm not supporting anything that old.
+    #def __del__(self):
+    #    _core.DisposeModuleProvider(self._raw)
 
-    CountParams = _library.function(ctypes.c_uint, 'LLVMCountParams', [Value])
-    GetParams = _library.function(None, 'LLVMGetParams', [Value, ctypes.POINTER(Value)])
-    GetParam = _library.function(Value, 'LLVMGetParam', [Value, ctypes.c_uint])
-    GetParamParent = _library.function(Value, 'LLVMGetParamParent', [Value])
-    GetFirstParam = _library.function(Value, 'LLVMGetFirstParam', [Value])
-    GetLastParam = _library.function(Value, 'LLVMGetLastParam', [Value])
-    GetNextParam = _library.function(Value, 'LLVMGetNextParam', [Value])
-    GetPreviousParam = _library.function(Value, 'LLVMGetPreviousParam', [Value])
-    AddAttribute = _library.function(None, 'LLVMAddAttribute', [Value, Attribute])
-    RemoveAttribute = _library.function(None, 'LLVMRemoveAttribute', [Value, Attribute])
-    GetAttribute = _library.function(Attribute, 'LLVMGetAttribute', [Value])
-    SetParamAlignment = _library.function(None, 'LLVMSetParamAlignment', [Value, ctypes.c_uint])
+def message_to_string(message):
+    ''' Convert an LLVM "message" to a python string, freeing the C version
+    '''
+    s = ctypes.cast(message, ctypes.c_char_p).value
+    _core.DisposeMessage(message)
+    return b2u(s)
 
+class MemoryBuffer:
+    __slots__ = ('_raw',)
+    def __init__(self, filename):
+        self._raw = raw = _core.MemoryBuffer()
+        error = _c.string_buffer()
 
-    MDStringInContext = _library.function(Value, 'LLVMMDStringInContext', [Context, _c.string_buffer, ctypes.c_uint])
-    MDString = _library.function(Value, 'LLVMMDString', [_c.string_buffer, ctypes.c_uint])
-    MDNodeInContext = _library.function(Value, 'LLVMMDNodeInContext', [Context, ctypes.POINTER(Value), ctypes.c_uint])
-    MDNode = _library.function(Value, 'LLVMMDNode', [ctypes.POINTER(Value), ctypes.c_uint])
-    GetMDString = _library.function(_c.string_buffer, 'LLVMGetMDString', [Value, ctypes.POINTER(ctypes.c_uint)])
+        if filename is not None:
+            rv = bool(_core.CreateMemoryBufferWithContentsOfFile(u2b(filename), ctypes.byref(self._raw), ctypes.byref(error)))
+        else:
+            rv = bool(_core.CreateMemoryBufferWithSTDIN(ctypes.byref(self._raw), ctypes.byref(error)))
 
+        if rv:
+            error = message_to_string(error)
+            raise Exception(error)
 
-    BasicBlockAsValue = _library.function(Value, 'LLVMBasicBlockAsValue', [BasicBlock])
-    ValueIsBasicBlock = _library.function(Bool, 'LLVMValueIsBasicBlock', [Value])
-    ValueAsBasicBlock = _library.function(BasicBlock, 'LLVMValueAsBasicBlock', [Value])
-    GetBasicBlockParent = _library.function(Value, 'LLVMGetBasicBlockParent', [BasicBlock])
-    GetBasicBlockTerminator = _library.function(Value, 'LLVMGetBasicBlockTerminator', [BasicBlock])
-    CountBasicBlocks = _library.function(ctypes.c_uint, 'LLVMCountBasicBlocks', [Value])
-    GetBasicBlocks = _library.function(None, 'LLVMGetBasicBlocks', [Value, ctypes.POINTER(BasicBlock)])
-    GetFirstBasicBlock = _library.function(BasicBlock, 'LLVMGetFirstBasicBlock', [Value])
-    GetLastBasicBlock = _library.function(BasicBlock, 'LLVMGetLastBasicBlock', [Value])
-    GetNextBasicBlock = _library.function(BasicBlock, 'LLVMGetNextBasicBlock', [BasicBlock])
-    GetPreviousBasicBlock = _library.function(BasicBlock, 'LLVMGetPreviousBasicBlock', [BasicBlock])
-    GetEntryBasicBlock = _library.function(BasicBlock, 'LLVMGetEntryBasicBlock', [Value])
-    AppendBasicBlockInContext = _library.function(BasicBlock, 'LLVMAppendBasicBlockInContext', [Context, Value, ctypes.c_char_p])
-    AppendBasicBlock = _library.function(BasicBlock, 'LLVMAppendBasicBlock', [Value, ctypes.c_char_p])
-    InsertBasicBlockInContext = _library.function(BasicBlock, 'LLVMInsertBasicBlockInContext', [Context, BasicBlock, ctypes.c_char_p])
-    InsertBasicBlock = _library.function(BasicBlock, 'LLVMInsertBasicBlock', [BasicBlock, ctypes.c_char_p])
-    DeleteBasicBlock = _library.function(None, 'LLVMDeleteBasicBlock', [BasicBlock])
-    RemoveBasicBlockFromParent = _library.function(None, 'LLVMRemoveBasicBlockFromParent', [BasicBlock])
-    MoveBasicBlockBefore = _library.function(None, 'LLVMMoveBasicBlockBefore', [BasicBlock, BasicBlock])
-    MoveBasicBlockAfter = _library.function(None, 'LLVMMoveBasicBlockAfter', [BasicBlock, BasicBlock])
-    GetFirstInstruction = _library.function(Value, 'LLVMGetFirstInstruction', [BasicBlock])
-    GetLastInstruction = _library.function(Value, 'LLVMGetLastInstruction', [BasicBlock])
+    def __del__(self):
+        _core.DisposeMemoryBuffer(self._raw)
 
-    HasMetadata = _library.function(ctypes.c_int, 'LLVMHasMetadata', [Value])
-    GetMetadata = _library.function(Value, 'LLVMGetMetadata', [Value, ctypes.c_uint])
-    SetMetadata = _library.function(None, 'LLVMSetMetadata', [Value, ctypes.c_uint, Value])
-    GetInstructionParent = _library.function(BasicBlock, 'LLVMGetInstructionParent', [Value])
-    GetNextInstruction = _library.function(Value, 'LLVMGetNextInstruction', [Value])
-    GetPreviousInstruction = _library.function(Value, 'LLVMGetPreviousInstruction', [Value])
-    InstructionEraseFromParent = _library.function(None, 'LLVMInstructionEraseFromParent', [Value])
-    GetInstructionOpcode = _library.function(Opcode, 'LLVMGetInstructionOpcode', [Value])
-    GetICmpPredicate = _library.function(IntPredicate, 'LLVMGetICmpPredicate', [Value])
+class PassRegistry:
+    __slots__ = ('_raw',)
+    def __init__(self, raw):
+        assert isinstance(raw, _core.PassRegistry)
+        self._raw = raw
 
-    SetInstructionCallConv = _library.function(None, 'LLVMSetInstructionCallConv', [Value, ctypes.c_uint])
-    GetInstructionCallConv = _library.function(ctypes.c_uint, 'LLVMGetInstructionCallConv', [Value])
-    AddInstrAttribute = _library.function(None, 'LLVMAddInstrAttribute', [Value, ctypes.c_uint, Attribute])
-    RemoveInstrAttribute = _library.function(None, 'LLVMRemoveInstrAttribute', [Value, ctypes.c_uint,  Attribute])
-    SetInstrParamAlignment = _library.function(None, 'LLVMSetInstrParamAlignment', [Value, ctypes.c_uint, ctypes.c_uint])
-    IsTailCall = _library.function(Bool, 'LLVMIsTailCall', [Value])
-    SetTailCall = _library.function(None, 'LLVMSetTailCall', [Value, Bool])
+    @staticmethod
+    def get_singleton_instance():
+        try:
+            return PassRegistry.singleton_instance
+        except AttributeError:
+            pass
+        raw = _core.GetGlobalPassRegistry()
+        # I don't know what this does, but it looks important.
+        _core.InitializeCore(raw)
+        PassRegistry.singleton_instance = PassRegistry(raw)
 
-    GetSwitchDefaultDest = _library.function(BasicBlock, 'LLVMGetSwitchDefaultDest', [Value])
+class PassManagerBase:
+    __slots__ = ('_raw',)
+    def __init__(self, raw):
+        assert isinstance(raw, _core.PassManager)
+        self._raw = raw
+    def __del__(self):
+        ''' Frees the memory of a pass pipeline. For function pipelines,
+            does not free the module.
+        '''
+        _core.DisposePassManager(self._raw)
 
-    AddIncoming = _library.function(None, 'LLVMAddIncoming', [Value, ctypes.POINTER(Value), ctypes.POINTER(BasicBlock), ctypes.c_uint])
-    CountIncoming = _library.function(ctypes.c_uint, 'LLVMCountIncoming', [Value])
-    GetIncomingValue = _library.function(Value, 'LLVMGetIncomingValue', [Value, ctypes.c_uint])
-    GetIncomingBlock = _library.function(BasicBlock, 'LLVMGetIncomingBlock', [Value, ctypes.c_uint])
+class PassManager(PassManagerBase):
+    __slots__ = ()
+    def __init__(self):
+        ''' Constructs a new whole-module pass pipeline.
 
+            This type of pipeline is suitable for link-time optimization
+            and whole-module transformations.
+        '''
+        raw = _core.CreatePassManager()
+        PassManagerBase.__init__(self, raw)
+    def run(self, mod):
+        ''' Initializes, executes on the provided module, and finalizes all
+            of the passes scheduled in the pass manager.
 
-    CreateBuilderInContext = _library.function(Builder, 'LLVMCreateBuilderInContext', [Context])
-    CreateBuilder = _library.function(Builder, 'LLVMCreateBuilder', [])
-    PositionBuilder = _library.function(None, 'LLVMPositionBuilder', [Builder, BasicBlock, Value])
-    PositionBuilderBefore = _library.function(None, 'LLVMPositionBuilderBefore', [Builder, Value])
-    PositionBuilderAtEnd = _library.function(None, 'LLVMPositionBuilderAtEnd', [Builder, BasicBlock])
-    GetInsertBlock = _library.function(BasicBlock, 'LLVMGetInsertBlock', [Builder])
-    ClearInsertionPosition = _library.function(None, 'LLVMClearInsertionPosition', [Builder])
-    InsertIntoBuilder = _library.function(None, 'LLVMInsertIntoBuilder', [Builder, Value])
-    InsertIntoBuilderWithName = _library.function(None, 'LLVMInsertIntoBuilderWithName', [Builder, Value, ctypes.c_char_p])
-    DisposeBuilder = _library.function(None, 'LLVMDisposeBuilder', [Builder])
+            Returns 1 if any of the passes modified the module, 0 otherwise.
+        '''
+        return bool(_core.RunPassManager(self._raw, mod._raw))
 
-    SetCurrentDebugLocation = _library.function(None, 'LLVMSetCurrentDebugLocation', [Builder, Value])
-    GetCurrentDebugLocation = _library.function(Value, 'LLVMGetCurrentDebugLocation', [Builder])
-    SetInstDebugLocation = _library.function(None, 'LLVMSetInstDebugLocation', [Builder, Value])
+class FunctionPassManager(PassManagerBase):
+    __slots__ = ()
+    def __init__(self, mod):
+        ''' Constructs a new function-by-function pass pipeline over the
+            module.
 
-    BuildRetVoid = _library.function(Value, 'LLVMBuildRetVoid', [Builder])
-    BuildRet = _library.function(Value, 'LLVMBuildRet', [Builder, Value])
-    BuildAggregateRet = _library.function(Value, 'LLVMBuildAggregateRet', [Builder, ctypes.POINTER(Value), ctypes.c_uint])
-    BuildBr = _library.function(Value, 'LLVMBuildBr', [Builder, BasicBlock])
-    BuildCondBr = _library.function(Value, 'LLVMBuildCondBr', [Builder, Value, BasicBlock, BasicBlock])
-    BuildSwitch = _library.function(Value, 'LLVMBuildSwitch', [Builder, Value, BasicBlock, ctypes.c_uint])
-    BuildIndirectBr = _library.function(Value, 'LLVMBuildIndirectBr', [Builder, Value, ctypes.c_uint])
-    BuildInvoke = _library.function(Value, 'LLVMBuildInvoke', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, BasicBlock, BasicBlock, ctypes.c_char_p])
-    BuildLandingPad = _library.function(Value, 'LLVMBuildLandingPad', [Builder, Type, Value, ctypes.c_uint, ctypes.c_char_p])
-    BuildResume = _library.function(Value, 'LLVMBuildResume', [Builder, Value])
-    BuildUnreachable = _library.function(Value, 'LLVMBuildUnreachable', [Builder])
-    AddCase = _library.function(None, 'LLVMAddCase', [Value, Value, BasicBlock])
-    AddDestination = _library.function(None, 'LLVMAddDestination', [Value, BasicBlock])
-    AddClause = _library.function(None, 'LLVMAddClause', [Value, Value])
-    SetCleanup = _library.function(None, 'LLVMSetCleanup', [Value, Bool])
+            It does not take ownership of the module. This type of pipeline
+            is suitable for code generation and JIT compilation tasks.
+        '''
+        raw = _core.CreateFunctionPassManagerForModule(mod._raw)
+        PassManagerBase.__init__(self, raw)
 
-    BuildAdd = _library.function(Value, 'LLVMBuildAdd', [Builder, Value, Value, ctypes.c_char_p])
-    BuildNSWAdd = _library.function(Value, 'LLVMBuildNSWAdd', [Builder, Value, Value, ctypes.c_char_p])
-    BuildNUWAdd = _library.function(Value, 'LLVMBuildNUWAdd', [Builder, Value, Value, ctypes.c_char_p])
-    BuildFAdd = _library.function(Value, 'LLVMBuildFAdd', [Builder, Value, Value, ctypes.c_char_p])
-    BuildSub = _library.function(Value, 'LLVMBuildSub', [Builder, Value, Value, ctypes.c_char_p])
-    BuildNSWSub = _library.function(Value, 'LLVMBuildNSWSub', [Builder, Value, Value, ctypes.c_char_p])
-    BuildNUWSub = _library.function(Value, 'LLVMBuildNUWSub', [Builder, Value, Value, ctypes.c_char_p])
-    BuildFSub = _library.function(Value, 'LLVMBuildFSub', [Builder, Value, Value, ctypes.c_char_p])
-    BuildMul = _library.function(Value, 'LLVMBuildMul', [Builder, Value, Value, ctypes.c_char_p])
-    BuildNSWMul = _library.function(Value, 'LLVMBuildNSWMul', [Builder, Value, Value, ctypes.c_char_p])
-    BuildNUWMul = _library.function(Value, 'LLVMBuildNUWMul', [Builder, Value, Value, ctypes.c_char_p])
-    BuildFMul = _library.function(Value, 'LLVMBuildFMul', [Builder, Value, Value, ctypes.c_char_p])
-    BuildUDiv = _library.function(Value, 'LLVMBuildUDiv', [Builder, Value, Value, ctypes.c_char_p])
-    BuildSDiv = _library.function(Value, 'LLVMBuildSDiv', [Builder, Value, Value, ctypes.c_char_p])
-    BuildExactSDiv = _library.function(Value, 'LLVMBuildExactSDiv', [Builder, Value, Value, ctypes.c_char_p])
-    BuildFDiv = _library.function(Value, 'LLVMBuildFDiv', [Builder, Value, Value, ctypes.c_char_p])
-    BuildURem = _library.function(Value, 'LLVMBuildURem', [Builder, Value, Value, ctypes.c_char_p])
-    BuildSRem = _library.function(Value, 'LLVMBuildSRem', [Builder, Value, Value, ctypes.c_char_p])
-    BuildFRem = _library.function(Value, 'LLVMBuildFRem', [Builder, Value, Value, ctypes.c_char_p])
-    BuildShl = _library.function(Value, 'LLVMBuildShl', [Builder, Value, Value, ctypes.c_char_p])
-    BuildLShr = _library.function(Value, 'LLVMBuildLShr', [Builder, Value, Value, ctypes.c_char_p])
-    BuildAShr = _library.function(Value, 'LLVMBuildAShr', [Builder, Value, Value, ctypes.c_char_p])
-    BuildAnd = _library.function(Value, 'LLVMBuildAnd', [Builder, Value, Value, ctypes.c_char_p])
-    BuildOr = _library.function(Value, 'LLVMBuildOr', [Builder, Value, Value, ctypes.c_char_p])
-    BuildXor = _library.function(Value, 'LLVMBuildXor', [Builder, Value, Value, ctypes.c_char_p])
-    BuildBinOp = _library.function(Value, 'LLVMBuildBinOp', [Builder, Opcode, Value, Value, ctypes.c_char_p])
-    BuildNeg = _library.function(Value, 'LLVMBuildNeg', [Builder, Value, ctypes.c_char_p])
-    BuildNSWNeg = _library.function(Value, 'LLVMBuildNSWNeg', [Builder, Value, ctypes.c_char_p])
-    BuildNUWNeg = _library.function(Value, 'LLVMBuildNUWNeg', [Builder, Value, ctypes.c_char_p])
-    BuildFNeg = _library.function(Value, 'LLVMBuildFNeg', [Builder, Value, ctypes.c_char_p])
-    BuildNot = _library.function(Value, 'LLVMBuildNot', [Builder, Value, ctypes.c_char_p])
+    def initialize(self):
+        ''' Initializes all of the function passes scheduled in the
+            function pass manager.
 
-    BuildMalloc = _library.function(Value, 'LLVMBuildMalloc', [Builder, Type, ctypes.c_char_p])
-    BuildArrayMalloc = _library.function(Value, 'LLVMBuildArrayMalloc', [Builder, Type, Value, ctypes.c_char_p])
-    BuildAlloca = _library.function(Value, 'LLVMBuildAlloca', [Builder, Type, ctypes.c_char_p])
-    BuildArrayAlloca = _library.function(Value, 'LLVMBuildArrayAlloca', [Builder, Type, Value, ctypes.c_char_p])
-    BuildFree = _library.function(Value, 'LLVMBuildFree', [Builder, Value])
-    BuildLoad = _library.function(Value, 'LLVMBuildLoad', [Builder, Value, ctypes.c_char_p])
-    BuildStore = _library.function(Value, 'LLVMBuildStore', [Builder, Value, Value])
-    BuildGEP = _library.function(Value, 'LLVMBuildGEP', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, ctypes.c_char_p])
-    BuildInBoundsGEP = _library.function(Value, 'LLVMBuildInBoundsGEP', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, ctypes.c_char_p])
-    BuildStructGEP = _library.function(Value, 'LLVMBuildStructGEP', [Builder, Value, ctypes.c_uint, ctypes.c_char_p])
-    BuildGlobalString = _library.function(Value, 'LLVMBuildGlobalString', [Builder, ctypes.c_char_p, ctypes.c_char_p])
-    BuildGlobalStringPtr = _library.function(Value, 'LLVMBuildGlobalStringPtr', [Builder, ctypes.c_char_p, ctypes.c_char_p])
-    GetVolatile = _library.function(Bool, 'LLVMGetVolatile', [Value])
-    SetVolatile = _library.function(None, 'LLVMSetVolatile', [Value, Bool])
+            Returns 1 if any of the passes modified the module, 0 otherwise.
+        '''
+        return bool(_core.InitializeFunctionPassManager(self._raw))
+    def run(self, func):
+        ''' Executes all of the function passes scheduled in the
+            function pass manager on the provided function.
 
-    BuildTrunc = _library.function(Value, 'LLVMBuildTrunc', [Builder, Value, Type, ctypes.c_char_p])
-    BuildZExt = _library.function(Value, 'LLVMBuildZExt', [Builder, Value, Type, ctypes.c_char_p])
-    BuildSExt = _library.function(Value, 'LLVMBuildSExt', [Builder, Value, Type, ctypes.c_char_p])
-    BuildFPToUI = _library.function(Value, 'LLVMBuildFPToUI', [Builder, Value, Type, ctypes.c_char_p])
-    BuildFPToSI = _library.function(Value, 'LLVMBuildFPToSI', [Builder, Value, Type, ctypes.c_char_p])
-    BuildUIToFP = _library.function(Value, 'LLVMBuildUIToFP', [Builder, Value, Type, ctypes.c_char_p])
-    BuildSIToFP = _library.function(Value, 'LLVMBuildSIToFP', [Builder, Value, Type, ctypes.c_char_p])
-    BuildFPTrunc = _library.function(Value, 'LLVMBuildFPTrunc', [Builder, Value, Type, ctypes.c_char_p])
-    BuildFPExt = _library.function(Value, 'LLVMBuildFPExt', [Builder, Value, Type, ctypes.c_char_p])
-    BuildPtrToInt = _library.function(Value, 'LLVMBuildPtrToInt', [Builder, Value, Type, ctypes.c_char_p])
-    BuildIntToPtr = _library.function(Value, 'LLVMBuildIntToPtr', [Builder, Value, Type, ctypes.c_char_p])
-    BuildBitCast = _library.function(Value, 'LLVMBuildBitCast', [Builder, Value, Type, ctypes.c_char_p])
-    BuildZExtOrBitCast = _library.function(Value, 'LLVMBuildZExtOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
-    BuildSExtOrBitCast = _library.function(Value, 'LLVMBuildSExtOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
-    BuildTruncOrBitCast = _library.function(Value, 'LLVMBuildTruncOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
-    BuildCast = _library.function(Value, 'LLVMBuildCast', [Builder, Opcode, Value, Type, ctypes.c_char_p])
-    BuildPointerCast = _library.function(Value, 'LLVMBuildPointerCast', [Builder, Value, Type, ctypes.c_char_p])
-    BuildIntCast = _library.function(Value, 'LLVMBuildIntCast', [Builder, Value, Type, ctypes.c_char_p])
-    BuildFPCast = _library.function(Value, 'LLVMBuildFPCast', [Builder, Value, Type, ctypes.c_char_p])
+            Returns 1 if any of the passes modified the function,
+            false otherwise.
+        '''
+        return bool(_core.RunFunctionPassManager(self._raw, func._raw))
+    def finalize(self):
+        ''' Finalizes all of the function passes scheduled in in the
+            function pass manager.
 
-    BuildICmp = _library.function(Value, 'LLVMBuildICmp', [Builder, IntPredicate, Value, Value, ctypes.c_char_p])
-    BuildFCmp = _library.function(Value, 'LLVMBuildFCmp', [Builder, RealPredicate, Value, Value, ctypes.c_char_p])
-
-    BuildPhi = _library.function(Value, 'LLVMBuildPhi', [Builder, Type, ctypes.c_char_p])
-    BuildCall = _library.function(Value, 'LLVMBuildCall', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, ctypes.c_char_p])
-    BuildSelect = _library.function(Value, 'LLVMBuildSelect', [Builder, Value, Value, Value, ctypes.c_char_p])
-    BuildVAArg = _library.function(Value, 'LLVMBuildVAArg', [Builder, Value, Type, ctypes.c_char_p])
-    BuildExtractElement = _library.function(Value, 'LLVMBuildExtractElement', [Builder, Value, Value, ctypes.c_char_p])
-    BuildInsertElement = _library.function(Value, 'LLVMBuildInsertElement', [Builder, Value, Value, Value, ctypes.c_char_p])
-    BuildShuffleVector = _library.function(Value, 'LLVMBuildShuffleVector', [Builder, Value, Value, Value, ctypes.c_char_p])
-    BuildExtractValue = _library.function(Value, 'LLVMBuildExtractValue', [Builder, Value, ctypes.c_uint, ctypes.c_char_p])
-    BuildInsertValue = _library.function(Value, 'LLVMBuildInsertValue', [Builder, Value, Value, ctypes.c_uint, ctypes.c_char_p])
-
-    BuildIsNull = _library.function(Value, 'LLVMBuildIsNull', [Builder, Value, ctypes.c_char_p])
-    BuildIsNotNull = _library.function(Value, 'LLVMBuildIsNotNull', [Builder, Value, ctypes.c_char_p])
-    BuildPtrDiff = _library.function(Value, 'LLVMBuildPtrDiff', [Builder, Value, Value, ctypes.c_char_p])
-
-
-    CreateModuleProviderForExistingModule = _library.function(ModuleProvider, 'LLVMCreateModuleProviderForExistingModule', [Module])
-    DisposeModuleProvider = _library.function(None, 'LLVMDisposeModuleProvider', [ModuleProvider])
-
-
-    CreateMemoryBufferWithContentsOfFile = _library.function(Bool, 'LLVMCreateMemoryBufferWithContentsOfFile', [ctypes.c_char_p, ctypes.POINTER(MemoryBuffer), ctypes.POINTER(_c.string_buffer)])
-    CreateMemoryBufferWithSTDIN = _library.function(Bool, 'LLVMCreateMemoryBufferWithSTDIN', [ctypes.POINTER(MemoryBuffer), ctypes.POINTER(_c.string_buffer)])
-    DisposeMemoryBuffer = _library.function(None, 'LLVMDisposeMemoryBuffer', [MemoryBuffer])
-
-
-    GetGlobalPassRegistry = _library.function(PassRegistry, 'LLVMGetGlobalPassRegistry', [])
-
-    CreatePassManager = _library.function(PassManager, 'LLVMCreatePassManager', [])
-    CreateFunctionPassManagerForModule = _library.function(PassManager, 'LLVMCreateFunctionPassManagerForModule', [Module])
-    CreateFunctionPassManager = _library.function(PassManager, 'LLVMCreateFunctionPassManager', [ModuleProvider])
-    RunPassManager = _library.function(Bool, 'LLVMRunPassManager', [PassManager, Module])
-    InitializeFunctionPassManager = _library.function(Bool, 'LLVMInitializeFunctionPassManager', [PassManager])
-    RunFunctionPassManager = _library.function(Bool, 'LLVMRunFunctionPassManager', [PassManager, Value])
-    FinalizeFunctionPassManager = _library.function(Bool, 'LLVMFinalizeFunctionPassManager', [PassManager])
-    DisposePassManager = _library.function(None, 'LLVMDisposePassManager', [PassManager])
+            Returns 1 if any of the passes modified the module, 0 otherwise.
+        '''
+        return bool(_core.FinalizeFunctionPassManager(self._raw))
