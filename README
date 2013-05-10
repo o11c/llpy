@@ -1,0 +1,10 @@
+Pure Python3 bindings for LLVM.
+
+These are a set of pure python bindings for LLVM. They will eventually be
+independent of the LLVM release.
+
+Currently, only Linux is supported, though porting is probably as simple
+as changing the library filenames.
+
+Python2 support is feasible, but would be complicated due to the int/long
+and str/unicode problems.
