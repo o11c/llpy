@@ -42,7 +42,7 @@ PassManager = _c.opaque('PassManager')
 PassRegistry = _c.opaque('PassRegistry')
 Use = _c.opaque('Use')
 
-Attribute = _c.bit_enum('Attribute',
+attributes = dict(
     ZExt            = 1 << 0,   # int param, return, call
     SExt            = 1 << 1,   # int param, return, call
     NoReturn        = 1 << 2,   # function, call
@@ -72,6 +72,8 @@ Attribute = _c.bit_enum('Attribute',
 
     #AddressSafety   = 1 << 32,  # function
 )
+Attribute = _c.bit_enum('Attribute', **dict(attributes))
+del attributes
 Attribute.__doc__ = '''Attributes are used in at least 3 places:
     - for function arguments
     - for function return
@@ -81,7 +83,7 @@ Attribute.__doc__ = '''Attributes are used in at least 3 places:
     Not all attributes are valid in all places.
 '''
 
-Opcode = _c.enum('Opcode',
+opcodes = dict(
     Ret             = 1,
     Br              = 2,
     Switch          = 3,
@@ -148,96 +150,111 @@ Opcode = _c.enum('Opcode',
     Resume          = 58,
     LandingPad      = 59,
 )
+Opcode = _c.enum('Opcode', **opcodes)
+del opcodes
 
-TypeKind = _c.enum('TypeKind',
-    Void        = 0,
-    Half        = 1,
-    Float       = 2,
-    Double      = 3,
-    X86_FP80    = 4,
-    FP128       = 5,
-    PPC_FP128   = 6,
-    Label       = 7,
-    Integer     = 8,
-    Function    = 9,
-    Struct      = 10,
-    Array       = 11,
-    Pointer     = 12,
-    Vector      = 13,
-    Metadata    = 14,
-    X86_MMX     = 15,
-)
+typekinds = [
+    'Void',
+    'Half',
+    'Float',
+    'Double',
+    'X86_FP80',
+    'FP128',
+    'PPC_FP128',
+    'Label',
+    'Integer',
+    'Function',
+    'Struct',
+    'Array',
+    'Pointer',
+    'Vector',
+    'Metadata',
+    'X86_MMX',
+]
+TypeKind = _c.enum('TypeKind', **{v: k for k, v in enumerate(typekinds)})
+del typekinds
 
-Linkage = _c.enum('Linkage',
-    External                    = 0,
-    AvailableExternally         = 1,
-    LinkOnceAny                 = 2,
-    LinkOnceODR                 = 3,
-    WeakAny                     = 4,
-    WeakODR                     = 5,
-    Appending                   = 6,
-    Internal                    = 7,
-    Private                     = 8,
-    DLLImport                   = 9,
-    DLLExport                   = 10,
-    ExternalWeak                = 11,
-    Ghost                       = 12,
-    Common                      = 13,
-    LinkerPrivate               = 14,
-    LinkerPrivateWeak           = 15,
-    LinkerPrivateWeakDefAuto    = 16,
-)
+linkages = [
+    'External',
+    'AvailableExternally',
+    'LinkOnceAny',
+    'LinkOnceODR',
+    'WeakAny',
+    'WeakODR',
+    'Appending',
+    'Internal',
+    'Private',
+    'DLLImport',
+    'DLLExport',
+    'ExternalWeak',
+    'Ghost',
+    'Common',
+    'LinkerPrivate',
+    'LinkerPrivateWeak',
+    'LinkerPrivateWeakDefAuto',
+]
+Linkage = _c.enum('Linkage', **{v: k for k, v in enumerate(linkages)})
+del linkages
 
-Visibility = _c.enum('Visibility',
-    Default     = 0,
-    Hidden      = 1,
-    Protected   = 2,
-)
+visibilities = [
+    'Default',
+    'Hidden',
+    'Protected',
+]
+Visibility = _c.enum('Visibility', **{v: k for k, v in enumerate(visibilities)})
+del visibilities
 
-CallConv = _c.enum('CallConv',
+call_convs = dict(
     C           = 0,
     Fast        = 8,
     Cold        = 9,
     X86Stdcall  = 64,
     X86Fastcall = 65,
 )
+CallConv = _c.enum('CallConv', **dict(call_convs))
 
-IntPredicate = _c.enum('IntPredicate',
-    EQ  = 32,
-    NE  = 33,
-    UGT = 34,
-    UGE = 35,
-    ULT = 36,
-    ULE = 37,
-    SGT = 38,
-    SGE = 39,
-    SLT = 40,
-    SLE = 41,
-)
+int_predicates = [
+    'EQ',
+    'NE',
+    'UGT',
+    'UGE',
+    'ULT',
+    'ULE',
+    'SGT',
+    'SGE',
+    'SLT',
+    'SLE',
+]
+IntPredicate = _c.enum('IntPredicate', **{v: k for k, v in enumerate(int_predicates, 32)})
+del int_predicates
 
-RealPredicate = _c.enum('RealPredicate',
-    FALSE   = 0,
-    OEQ     = 1,
-    OGT     = 2,
-    OGE     = 3,
-    OLT     = 4,
-    OLE     = 5,
-    ONE     = 6,
-    ORD     = 7,
-    UNO     = 8,
-    UEQ     = 9,
-    UGT     = 10,
-    UGE     = 11,
-    ULT     = 12,
-    ULE     = 13,
-    UNE     = 14,
-    TRUE    = 15,
-)
+real_predicates = [
+    'FALSE',
+    'OEQ',
+    'OGT',
+    'OGE',
+    'OLT',
+    'OLE',
+    'ONE',
+    'ORD',
+    'UNO',
+    'UEQ',
+    'UGT',
+    'UGE',
+    'ULT',
+    'ULE',
+    'UNE',
+    'TRUE',
+]
+RealPredicate = _c.enum('RealPredicate', **{v: k for k, v in enumerate(real_predicates, 0)})
+del real_predicates
 
-LandingPadClauseTy = _c.enum('LandingPadClauseTy',
-    Catch   = 0,
-    Filter  = 1,
-)
+landingpad_clause_tys = [
+    'Catch',
+    'Filter',
+]
+LandingPadClauseTy = _c.enum('LandingPadClauseTy', **{v: k for k, v in enumerate(landingpad_clause_tys)})
+del landingpad_clause_tys
 
 
 
