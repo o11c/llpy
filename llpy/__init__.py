@@ -36,10 +36,9 @@ __unknown_values = False
 __library_version = (3, 1)
 __library_soname = 'libLLVM-%d.%d.so.1' % __library_version
 
-__MIN_LIBRARY_VERSION = (2, 7)
+__MIN_LIBRARY_VERSION = (3, 0)
 # __MAX_LIBRARY_VERSION = (3, 3)
 __TESTED_LIBRARY_VERSIONS = [
-        # (2, 9),
         (3, 0),
         (3, 1),
         # (3, 2),
