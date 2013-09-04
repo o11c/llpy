@@ -25,6 +25,7 @@ from . import _c
 import llpy
 del llpy.set_library
 _library = _c.Library(llpy.__library_soname)
+_version = llpy.__library_version
 del llpy
 
 
@@ -68,10 +69,16 @@ attributes = dict(
     StackAlignment  = 7 << 26,  # function
     ReturnsTwice    = 1 << 29,  # function
     UWTable         = 1 << 30,  # function
-    NonLazyBind_buggy     = 1 << 31,  # function
-
-    #AddressSafety   = 1 << 32,  # function
 )
+if _version <= (3, 0):
+    attributes.update(
+        NonLazyBind     = 1 << 31,  # function
+    )
+if (3, 1) <= _version:
+    attributes.update(
+        NonLazyBind_buggy     = 1 << 31,  # function
+        #AddressSafety   = 1 << 32,  # function
+    )
 Attribute = _c.bit_enum('Attribute', **dict(attributes))
 del attributes
 Attribute.__doc__ = '''Attributes are used in at least 3 places:
@@ -150,12 +157,21 @@ opcodes = dict(
     Resume          = 58,
     LandingPad      = 59,
 )
+if _version <= (3, 0):
+    opcodes.update(
+        Unwind = 60,
+    )
 Opcode = _c.enum('Opcode', **opcodes)
 del opcodes
 
 typekinds = [
     'Void',
-    'Half',
+]
+if (3, 1) <= _version:
+    typekinds += [
+        'Half',
+    ]
+typekinds += [
     'Float',
     'Double',
     'X86_FP80',
@@ -283,7 +299,8 @@ GetTypeByName = _library.function(Type, 'LLVMGetTypeByName', [Module, ctypes.c_c
 
 GetNamedMetadataNumOperands = _library.function(ctypes.c_uint, 'LLVMGetNamedMetadataNumOperands', [Module, ctypes.c_char_p])
 GetNamedMetadataOperands = _library.function(None, 'LLVMGetNamedMetadataOperands', [Module, ctypes.c_char_p, ctypes.POINTER(Value)])
-AddNamedMetadataOperand = _library.function(None, 'LLVMAddNamedMetadataOperand', [Module, ctypes.c_char_p, Value])
+if (3, 1) <= _version:
+    AddNamedMetadataOperand = _library.function(None, 'LLVMAddNamedMetadataOperand', [Module, ctypes.c_char_p, Value])
 
 AddFunction = _library.function(Value, 'LLVMAddFunction', [Module, ctypes.c_char_p, Type])
 GetNamedFunction = _library.function(Value, 'LLVMGetNamedFunction', [Module, ctypes.c_char_p])
@@ -315,14 +332,16 @@ IntType = _library.function(Type, 'LLVMIntType', [ctypes.c_uint])
 GetIntTypeWidth = _library.function(ctypes.c_uint, 'LLVMGetIntTypeWidth', [Type])
 
 
-HalfTypeInContext = _library.function(Type, 'LLVMHalfTypeInContext', [Context])
+if (3, 1) <= _version:
+    HalfTypeInContext = _library.function(Type, 'LLVMHalfTypeInContext', [Context])
 FloatTypeInContext = _library.function(Type, 'LLVMFloatTypeInContext', [Context])
 DoubleTypeInContext = _library.function(Type, 'LLVMDoubleTypeInContext', [Context])
 X86FP80TypeInContext = _library.function(Type, 'LLVMX86FP80TypeInContext', [Context])
 FP128TypeInContext = _library.function(Type, 'LLVMFP128TypeInContext', [Context])
 PPCFP128TypeInContext = _library.function(Type, 'LLVMPPCFP128TypeInContext', [Context])
 
-HalfType = _library.function(Type, 'LLVMHalfType', [])
+if (3, 1) <= _version:
+    HalfType = _library.function(Type, 'LLVMHalfType', [])
 FloatType = _library.function(Type, 'LLVMFloatType', [])
 DoubleType = _library.function(Type, 'LLVMDoubleType', [])
 X86FP80Type = _library.function(Type, 'LLVMX86FP80Type', [])
@@ -402,6 +421,10 @@ IsACallInst = _library.function(Value, 'LLVMIsACallInst', [Value])
 IsAIntrinsicInst = _library.function(Value, 'LLVMIsAIntrinsicInst', [Value])
 IsADbgInfoIntrinsic = _library.function(Value, 'LLVMIsADbgInfoIntrinsic', [Value])
 IsADbgDeclareInst = _library.function(Value, 'LLVMIsADbgDeclareInst', [Value])
+if _version <= (3, 0) and False:
+    # These are declared in the header, but linking finds no such symbol.
+    IsAEHExceptionIntrinsic = _library.function(Value, 'LLVMIsAEHExceptionIntrinsic', [Value])
+    IsAEHSelectorIntrinsic = _library.function(Value, 'LLVMIsAEHSelectorIntrinsic', [Value])
 IsAMemIntrinsic = _library.function(Value, 'LLVMIsAMemIntrinsic', [Value])
 IsAMemCpyInst = _library.function(Value, 'LLVMIsAMemCpyInst', [Value])
 IsAMemMoveInst = _library.function(Value, 'LLVMIsAMemMoveInst', [Value])
@@ -602,6 +625,10 @@ MDString = _library.function(Value, 'LLVMMDString', [_c.string_buffer, ctypes.c_
 MDNodeInContext = _library.function(Value, 'LLVMMDNodeInContext', [Context, ctypes.POINTER(Value), ctypes.c_uint])
 MDNode = _library.function(Value, 'LLVMMDNode', [ctypes.POINTER(Value), ctypes.c_uint])
 GetMDString = _library.function(_c.string_buffer, 'LLVMGetMDString', [Value, ctypes.POINTER(ctypes.c_uint)])
+if _version <= (3, 0) and False:
+    # These are declared in the header, but linking finds no such symbol.
+    GetMDNodeNumOperands = _library.function(ctypes.c_int, 'LLVMGetMDNodeNumOperands', [Value])
+    GetMDNodeOperand = _library.function(Value, 'LLVMGetMDNodeOperand', [Value, ctypes.c_uint]);
 
 
 BasicBlockAsValue = _library.function(Value, 'LLVMBasicBlockAsValue', [BasicBlock])
@@ -728,8 +755,9 @@ BuildInBoundsGEP = _library.function(Value, 'LLVMBuildInBoundsGEP', [Builder, Va
 BuildStructGEP = _library.function(Value, 'LLVMBuildStructGEP', [Builder, Value, ctypes.c_uint, ctypes.c_char_p])
 BuildGlobalString = _library.function(Value, 'LLVMBuildGlobalString', [Builder, ctypes.c_char_p, ctypes.c_char_p])
 BuildGlobalStringPtr = _library.function(Value, 'LLVMBuildGlobalStringPtr', [Builder, ctypes.c_char_p, ctypes.c_char_p])
-GetVolatile = _library.function(Bool, 'LLVMGetVolatile', [Value])
-SetVolatile = _library.function(None, 'LLVMSetVolatile', [Value, Bool])
+if (3, 1) <= _version:
+    GetVolatile = _library.function(Bool, 'LLVMGetVolatile', [Value])
+    SetVolatile = _library.function(None, 'LLVMSetVolatile', [Value, Bool])
 
 BuildTrunc = _library.function(Value, 'LLVMBuildTrunc', [Builder, Value, Type, ctypes.c_char_p])
 BuildZExt = _library.function(Value, 'LLVMBuildZExt', [Builder, Value, Type, ctypes.c_char_p])

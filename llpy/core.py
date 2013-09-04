@@ -35,6 +35,8 @@ from llpy.c.core import (
         IntPredicate,
         RealPredicate,
         LandingPadClauseTy,
+
+        _version,
 )
 from llpy import __unknown_values as unknown_values
 
@@ -162,12 +164,13 @@ class Module:
         _core.GetNamedMetadataOperands(self._raw, bname, temp_buf)
         return [Value(v, self._context) for v in temp_buf]
 
-    def AddNamedMetadataOperand(self, name, val):
-        ''' Add an MDNOde operand to named metadata.
-        '''
-        assert isinstance(val, MDNode)
-        bname = u2b(name)
-        _core.AddNamedMetadataOperand(self._raw, bname, val._raw)
+    if (3, 1) <= _version:
+        def AddNamedMetadataOperand(self, name, val):
+            ''' Add an MDNOde operand to named metadata.
+            '''
+            assert isinstance(val, MDNode)
+            bname = u2b(name)
+            _core.AddNamedMetadataOperand(self._raw, bname, val._raw)
 
 
     def AddFunction(self, ftype, name):
@@ -372,22 +375,23 @@ class RealType(Type):
         blen = len(bvalue)
         return Value(_core.ConstRealOfStringAndSize(self._raw, bvalue, blen), self._context)
 
-class HalfType(RealType):
-    __slots__ = ()
+if (3, 1) <= _version:
+    class HalfType(RealType):
+        __slots__ = ()
 
-    def __new__(cls, context):
-        ''' Obtain a 16-bit floating point type from a context.
-        '''
-        assert cls is HalfType
-        raw = _core.HalfTypeInContext(context._raw)
-        self = Type.__new__(Type, raw, context)
-        assert type(self) is HalfType
-        return self
+        def __new__(cls, context):
+            ''' Obtain a 16-bit floating point type from a context.
+            '''
+            assert cls is HalfType
+            raw = _core.HalfTypeInContext(context._raw)
+            self = Type.__new__(Type, raw, context)
+            assert type(self) is HalfType
+            return self
 
-    def __repr__(self):
-        return 'half'
+        def __repr__(self):
+            return 'half'
 
-Type._kind_type_map[TypeKind.Half] = HalfType
+    Type._kind_type_map[TypeKind.Half] = HalfType
 
 class FloatType(RealType):
     __slots__ = ()
@@ -1304,14 +1308,15 @@ class   AnyConstantVector(Value):
     '''
     __slots__ = ()
 
-class   ConstantDataSequential(Constant):
-    __slots__ = ()
+if (3, 1) <= _version:
+    class   ConstantDataSequential(Constant):
+        __slots__ = ()
 
-class    ConstantDataArray(ConstantDataSequential, AnyConstantArray):
-    __slots__ = ()
+    class    ConstantDataArray(ConstantDataSequential, AnyConstantArray):
+        __slots__ = ()
 
-class    ConstantDataVector(ConstantDataSequential, AnyConstantVector):
-    __slots__ = ()
+    class    ConstantDataVector(ConstantDataSequential, AnyConstantVector):
+        __slots__ = ()
 
 class   BlockAddress(Constant):
     __slots__ = ()
@@ -1520,6 +1525,8 @@ ConstantExpr._subclasses[Opcode.AtomicCmpXchg] = None
 ConstantExpr._subclasses[Opcode.AtomicRMW] = None
 ConstantExpr._subclasses[Opcode.Resume] = None
 ConstantExpr._subclasses[Opcode.LandingPad] = None
+if _version <= (3, 0):
+    ConstantExpr._subclasses[Opcode.Unwind] = None
 
 
 class   ConstantFP(Constant):
@@ -1987,11 +1994,12 @@ class   ShuffleVectorInst(Instruction):
 class AnyMemAccessInst(Value):
     __slots__ = ()
 
-    def GetVolatile(self):
-        return bool(_core.GetVolatile(self._raw))
+    if (3, 1) <= _version:
+        def GetVolatile(self):
+            return bool(_core.GetVolatile(self._raw))
 
-    def SetVolatile(self, vol):
-        _core.SetVolatile(self._raw, vol)
+        def SetVolatile(self, vol):
+            _core.SetVolatile(self._raw, vol)
 
 class   StoreInst(Instruction, AnyMemAccessInst):
     __slots__ = ()

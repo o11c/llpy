@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+from functools import reduce
 import gc
+import operator
 import os
 import unittest
 
 import llpy.core
+from llpy.c.core import _version
 
 class ReplaceOutFD:
     ''' Capture output send to stderr via C functions
@@ -169,21 +172,22 @@ module asm "\09ghi"
         st = llpy.core.StructType(self.ctx, None, 'foo')
         assert st is self.mod.GetTypeByName('foo')
 
-    def test_named_metadata_operands(self):
-        ctx = self.ctx
-        mod = self.mod
+    if (3, 1) <= _version:
+        def test_named_metadata_operands(self):
+            ctx = self.ctx
+            mod = self.mod
 
-        mdns = ctx.MDNode([ctx.MDString('foo'), ctx.MDString('bar')])
-        mdne = ctx.MDNode([])
-        mod.AddNamedMetadataOperand('baz', mdns)
-        mod.AddNamedMetadataOperand('baz', mdne)
-        mod.AddNamedMetadataOperand('qux', mdne)
+            mdns = ctx.MDNode([ctx.MDString('foo'), ctx.MDString('bar')])
+            mdne = ctx.MDNode([])
+            mod.AddNamedMetadataOperand('baz', mdns)
+            mod.AddNamedMetadataOperand('baz', mdne)
+            mod.AddNamedMetadataOperand('qux', mdne)
 
-        assert mod.GetNamedMetadataOperands('qwerty') == []
-        assert mod.GetNamedMetadataOperands('baz') == [mdns, mdne]
-        assert mod.GetNamedMetadataOperands('qux') == [mdne]
+            assert mod.GetNamedMetadataOperands('qwerty') == []
+            assert mod.GetNamedMetadataOperands('baz') == [mdns, mdne]
+            assert mod.GetNamedMetadataOperands('qux') == [mdne]
 
-        self.assertDump(mod,
+            self.assertDump(mod,
 '''; ModuleID = 'TestModule'
 
 !baz = !{!0, !1}
@@ -345,14 +349,15 @@ class TestType(DumpTestCase):
         assert answer is i32.ConstIntOfString('52', 8)
         assert answer is i32.ConstIntOfString('101010', 2)
 
-    def test_half(self):
-        self.do_test_real(llpy.core.HalfType, 'half', [
-            ('-inf', '0xFFF0000000000000'),
-            ('-0.0', '0x8000000000000000'),
-            ('0.0', '0x0'),
-            ('1.5', '0x3FF8000000000000'),
-            ('nan', '0x7FF8000000000000'),
-        ])
+    if (3, 1) <= _version:
+        def test_half(self):
+            self.do_test_real(llpy.core.HalfType, 'half', [
+                ('-inf', '0xFFF0000000000000'),
+                ('-0.0', '0x8000000000000000'),
+                ('0.0', '0x0'),
+                ('1.5', '0x3FF8000000000000'),
+                ('nan', '0x7FF8000000000000'),
+            ])
 
     def test_float(self):
         self.do_test_real(llpy.core.FloatType, 'float', [
@@ -637,10 +642,11 @@ class TestType(DumpTestCase):
         assert mdst.GetTypeContext() is ctx
 
         for md in [mds, mdne, mdni, mdns]:
-            if md is mds:
-                assert md.GetValueName() == 'foo'
-            else:
-                assert md.GetValueName() == ''
+            if (3, 1) <= _version:
+                if md is mds:
+                    assert md.GetValueName() == 'foo'
+                    continue
+            assert md.GetValueName() == ''
 
     def tearDown(self):
         del self.ctx
@@ -2373,10 +2379,11 @@ define void @func() {
 }
 
 ''')
-        assert not instr.GetVolatile()
-        instr.SetVolatile(True)
-        assert instr.GetVolatile()
-        self.assertDump(instr, '  %load = load volatile i32* %aa\n')
+        if (3, 1) <= _version:
+            assert not instr.GetVolatile()
+            instr.SetVolatile(True)
+            assert instr.GetVolatile()
+            self.assertDump(instr, '  %load = load volatile i32* %aa\n')
 
     def test_BuildStore(self):
         builder = self.builder
@@ -2410,10 +2417,11 @@ define void @func(i32 %arg) {
 }
 
 ''')
-        assert not instr.GetVolatile()
-        instr.SetVolatile(True)
-        assert instr.GetVolatile()
-        self.assertDump(instr, '  store volatile i32 %arg, i32* %aa\n')
+        if (3, 1) <= _version:
+            assert not instr.GetVolatile()
+            instr.SetVolatile(True)
+            assert instr.GetVolatile()
+            self.assertDump(instr, '  store volatile i32 %arg, i32* %aa\n')
 
 
     def test_BuildGEP(self):
@@ -2595,7 +2603,18 @@ define i32* @func({ [2 x i32] }* %ptr, i32 %idx) {
         assert instr.TypeOf() is i8ap
 
         builder.BuildRet(instr)
-        self.assertDump(self.mod,
+        if _version <= (3, 0):
+            self.assertDump(self.mod,
+r'''; ModuleID = 'TestBuilder'
+
+@hi = internal unnamed_addr constant [14 x i8] c"Hello, World!\00"
+
+define [14 x i8]* @func() {
+  ret [14 x i8]* @hi
+}
+''')
+        if (3, 1) <= _version:
+            self.assertDump(self.mod,
 r'''; ModuleID = 'TestBuilder'
 
 @hi = private unnamed_addr constant [14 x i8] c"Hello, World!\00"
@@ -2620,7 +2639,18 @@ define [14 x i8]* @func() {
         assert instr.TypeOf() is i8p
 
         builder.BuildRet(instr)
-        self.assertDump(self.mod,
+        if _version <= (3, 0):
+            self.assertDump(self.mod,
+r'''; ModuleID = 'TestBuilder'
+
+@hi = internal unnamed_addr constant [14 x i8] c"Hello, World!\00"
+
+define i8* @func() {
+  ret i8* getelementptr inbounds ([14 x i8]* @hi, i32 0, i32 0)
+}
+''')
+        if (3, 1) <= _version:
+            self.assertDump(self.mod,
 r'''; ModuleID = 'TestBuilder'
 
 @hi = private unnamed_addr constant [14 x i8] c"Hello, World!\00"
@@ -3386,7 +3416,10 @@ define i32 @func(<2 x i32> %arg, i32 %idx) {
         builder.PositionBuilderAtEnd(bb)
 
         cinstr = builder.BuildInsertElement(llpy.core.ConstVector([i32.ConstInt(3), i32.ConstInt(2)]), i32.ConstInt(1), i32.ConstNull())
-        assert isinstance(cinstr, llpy.core.ConstantDataVector)
+        if (3, 1) <= _version:
+            assert isinstance(cinstr, llpy.core.ConstantDataVector)
+        if _version <= (3, 0):
+            assert isinstance(cinstr, llpy.core.ConstantVector)
         assert cinstr is llpy.core.ConstVector([i32.ConstInt(1), i32.ConstInt(2)])
         assert cinstr.TypeOf() is i32v
 
@@ -3441,7 +3474,10 @@ define <2 x i32> @func(<2 x i32> %arg, i32 %idx, i32 %val) {
                 llpy.core.ConstVector([a, b]),
                 llpy.core.ConstVector([c, d]),
                 mask)
-        assert isinstance(cinstr, llpy.core.ConstantDataVector)
+        if (3, 1) <= _version:
+            assert isinstance(cinstr, llpy.core.ConstantDataVector)
+        if _version <= (3, 0):
+            assert isinstance(cinstr, llpy.core.ConstantVector)
         assert cinstr is llpy.core.ConstVector([a, c, d, b])
         assert cinstr.TypeOf() is v4t
 
@@ -3515,7 +3551,10 @@ define i32 @func([2 x i32] %arg) {
         builder.PositionBuilderAtEnd(bb)
 
         cinstr = builder.BuildInsertValue(i32.ConstArray([i32.ConstInt(3), i32.ConstInt(2)]), i32.ConstInt(1), 0)
-        assert isinstance(cinstr, llpy.core.ConstantDataArray)
+        if (3, 1) <= _version:
+            assert isinstance(cinstr, llpy.core.ConstantDataArray)
+        if _version <= (3, 0):
+            assert isinstance(cinstr, llpy.core.ConstantArray)
         assert cinstr is i32.ConstArray([i32.ConstInt(1), i32.ConstInt(2)])
         assert cinstr.TypeOf() is i32a
 
@@ -4392,14 +4431,18 @@ class TestConstant(DumpTestCase):
         self.assertDump(cne, 'i64 zext (%s to i64)\n' % (xi32_dump))
 
     def test_ConstFPTrunc(self):
-        half = llpy.core.HalfType(self.ctx)
-        cnv = self.float1.ConstFPTrunc(half)
-        assert cnv is half.ConstReal(1.0)
-        cne = self.xf1.ConstFPTrunc(half)
+        float = self.float
+        double = llpy.core.DoubleType(self.ctx)
+        double1 = double.ConstReal(1.0)
+        xd1 = self.xi1.ConstUIToFP(double)
+        xd1_dump = 'double uitofp (%s to double)' % (self.xi1_dump)
+        cnv = double1.ConstFPTrunc(float)
+        assert cnv is float.ConstReal(1.0)
+        cne = xd1.ConstFPTrunc(float)
         assert isinstance(cne, llpy.core.UnaryFPTruncConstantExpr)
         assert cne.GetNumOperands() == 1
-        assert cne.GetOperand(0) is self.xf1
-        self.assertDump(cne, 'half fptrunc (%s to half)\n' % (self.xf1_dump))
+        assert cne.GetOperand(0) is xd1
+        self.assertDump(cne, 'float fptrunc (%s to float)\n' % (xd1_dump))
 
     def test_ConstFPExt(self):
         double = llpy.core.DoubleType(self.ctx)
@@ -4935,29 +4978,35 @@ define void @func_def() {
 }
 ''')
 
+    Attribute = llpy.core.Attribute
+    attrs = [
+        ('noreturn', Attribute.NoReturn),
+        ('nounwind', Attribute.NoUnwind),
+        ('uwtable', Attribute.UWTable),
+        ('returns_twice', Attribute.ReturnsTwice),
+        ('readnone', Attribute.ReadNone),
+        ('readonly', Attribute.ReadOnly),
+        ('optsize', Attribute.OptimizeForSize),
+        ('noinline', Attribute.NoInline),
+        ('inlinehint', Attribute.InlineHint),
+        ('alwaysinline', Attribute.AlwaysInline),
+        ('ssp', Attribute.StackProtect),
+        ('sspreq', Attribute.StackProtectReq),
+        ('noredzone', Attribute.NoRedZone),
+        ('noimplicitfloat', Attribute.NoImplicitFloat),
+        ('naked', Attribute.Naked),
+    ]
+    if _version <= (3, 0): # buggy afterwards, see below
+        attrs += [
+            ('nonlazybind', Attribute.NonLazyBind),
+        ]
+    del Attribute
+
     def test_attr(self):
         Attribute = llpy.core.Attribute
-        attrs = [
-            ('noreturn', Attribute.NoReturn),
-            ('nounwind', Attribute.NoUnwind),
-            ('readnone', Attribute.ReadNone),
-            ('readonly', Attribute.ReadOnly),
-            ('noinline', Attribute.NoInline),
-            ('alwaysinline', Attribute.AlwaysInline),
-            ('optsize', Attribute.OptimizeForSize),
-            ('ssp', Attribute.StackProtect),
-            ('sspreq', Attribute.StackProtectReq),
-            ('noredzone', Attribute.NoRedZone),
-            ('noimplicitfloat', Attribute.NoImplicitFloat),
-            ('naked', Attribute.Naked),
-            ('inlinehint', Attribute.InlineHint),
-            ('returns_twice', Attribute.ReturnsTwice),
-            ('uwtable', Attribute.UWTable),
-            #('nonlazybind', Attribute.NonLazyBind), # buggy, see below
-        ]
         f = self.func_decl
         assert f.GetAttr() == Attribute()
-        for ir, at in attrs:
+        for ir, at in self.attrs:
             f.AddAttr(at)
             assert f.GetAttr() == at
             self.assertDump(f,
@@ -4967,50 +5016,57 @@ declare i32 @func_decl() %s
 ''' % ir)
             f.RemoveAttr(at)
 
-    @unittest.expectedFailure
-    def test_attr_bug(self):
-        Attribute = llpy.core.Attribute
-        ir = 'nonlazybind'
-        at = Attribute.NonLazyBind_buggy
-        f = self.func_decl
-        assert f.GetAttr() == Attribute()
-        f.AddAttr(at)
-        assert f.GetAttr() == at
-        self.assertDump(f,
+    if (3, 1) <= _version:
+        @unittest.expectedFailure
+        def test_attr_bug(self):
+            Attribute = llpy.core.Attribute
+            ir = 'nonlazybind'
+            at = Attribute.NonLazyBind_buggy
+            f = self.func_decl
+            assert f.GetAttr() == Attribute()
+            f.AddAttr(at)
+            assert f.GetAttr() == at
+            self.assertDump(f,
 '''
 declare i32 @func_decl() %s
 
 ''' % ir)
-        f.RemoveAttr(at)
-        assert f.GetAttr() == Attribute()
+            f.RemoveAttr(at)
+            assert f.GetAttr() == Attribute()
 
-    def test_attr_buggy(self):
-        # This one *should* fail
-        Attribute = llpy.core.Attribute
-        ir = 'nonlazybind address_safety'
-        at = Attribute.NonLazyBind_buggy
-        f = self.func_decl
-        assert f.GetAttr() == Attribute()
-        f.AddAttr(at)
-        assert f.GetAttr() == at
-        self.assertDump(f,
+        def test_attr_buggy(self):
+            # This one *should* fail
+            Attribute = llpy.core.Attribute
+            ir = 'nonlazybind address_safety'
+            at = Attribute.NonLazyBind_buggy
+            f = self.func_decl
+            assert f.GetAttr() == Attribute()
+            f.AddAttr(at)
+            assert f.GetAttr() == at
+            self.assertDump(f,
 '''
 declare i32 @func_decl() %s
 
 ''' % ir)
-        f.RemoveAttr(at)
-        assert f.GetAttr() == Attribute()
+            f.RemoveAttr(at)
+            assert f.GetAttr() == Attribute()
 
     def test_allattr(self):
-        At = llpy.core.Attribute
-        attrs = At.NoReturn | At.NoUnwind | At.ReadNone | At.ReadOnly | At.NoInline | At.AlwaysInline | At.OptimizeForSize | At.StackProtect | At.StackProtectReq | At.NoRedZone | At.NoImplicitFloat | At.Naked | At.InlineHint | At.ReturnsTwice | At.UWTable | At.NonLazyBind_buggy | At.StackAlignment
+        Attribute = llpy.core.Attribute
+        attrs = reduce(operator.or_, (at for ir, at in self.attrs))
+        irs = ' '.join(ir for ir, at in self.attrs)
+        if (3, 1) <= _version:
+            attrs |= Attribute.NonLazyBind_buggy
+            irs += ' nonlazybind address_safety'
+        attrs |= Attribute.StackAlignment
+        irs += ' alignstack(64)'
         f = self.func_decl
         f.AddAttr(attrs)
         self.assertDump(f,
 '''
-declare i32 @func_decl() noreturn nounwind uwtable returns_twice readnone readonly optsize noinline inlinehint alwaysinline ssp sspreq noredzone noimplicitfloat naked nonlazybind address_safety alignstack(64)
+declare i32 @func_decl() %s
 
-''')
+''' % irs)
 
     def test_attr_stackalign(self):
         Attribute = llpy.core.Attribute
