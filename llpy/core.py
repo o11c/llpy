@@ -571,7 +571,6 @@ class StructType(Type):
             return b2u(raw)
         return None
 
-    @deprecated
     def StructSetBody(self, body, packed=False):
         ''' Set the contents of a structure type.
 

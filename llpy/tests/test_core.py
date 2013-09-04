@@ -540,6 +540,44 @@ class TestType(DumpTestCase):
         self.assertDump(sv_aca, '{ i64 } { i64 -1 }\n')
         self.assertDump(sv_acp, '<{ i64 }> <{ i64 -1 }>\n')
 
+    def test_struct_recursive(self):
+        mod = llpy.core.Module(self.ctx, 'TestType.test_struct_recursive')
+        st = llpy.core.StructType(self.ctx, None, 'Recurse')
+        sp = llpy.core.PointerType(st)
+
+        assert st.GetStructName() == 'Recurse'
+        st.StructSetBody([sp])
+        assert st.GetStructElementTypes() == [sp]
+
+        sv = st.ConstNamedStruct([sp.ConstPointerNull()])
+        self.assertDump(sv, '%Recurse zeroinitializer\n')
+
+        sg = mod.AddGlobal(st, 'recurse')
+        assert sg.TypeOf() is sp
+        self.assertDump(sg,
+'''@recurse = external global %Recurse
+
+''')
+        self.assertDump(mod,
+'''; ModuleID = 'TestType.test_struct_recursive'
+
+%Recurse = type { %Recurse* }
+
+@recurse = external global %Recurse
+''')
+        sg.SetInitializer(st.ConstNamedStruct([sg]))
+        self.assertDump(sg,
+'''@recurse = global %Recurse { %Recurse* @recurse }
+
+''')
+        self.assertDump(mod,
+'''; ModuleID = 'TestType.test_struct_recursive'
+
+%Recurse = type { %Recurse* }
+
+@recurse = global %Recurse { %Recurse* @recurse }
+''')
+
     def test_array(self):
         i64 = llpy.core.IntegerType(self.ctx, 64)
         arr = llpy.core.ArrayType(i64, 2)
