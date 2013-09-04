@@ -44,9 +44,11 @@ def opaque(name):
     return ctypes.POINTER(Foo)
 
 def enum(name, **kwargs):
+    ety = ctypes.c_int # currently don't have a reason to use c_uint
     class Enum(ctypes.Structure):
         __slots__ = ()
-        _fields_ = [('value', ctypes.c_int)]
+        _fields_ = [('value', ety)]
+        _names = {v: k for k, v in kwargs.items()}
 
         def __hash__(self):
             return hash(self.value)
@@ -58,7 +60,18 @@ def enum(name, **kwargs):
             return self.value != other.value
 
         def __bool__(self):
-            return self.value
+            return bool(self.value)
+
+        def __repr__(self):
+            try:
+                name = Enum._names[self.value]
+            except KeyError:
+                if self.value:
+                    return '%s(%d)' % (Enum.__name__, self.value)
+                else:
+                    return '%s()' % (Enum.__name__)
+            else:
+                return '%s.%s' % (Enum.__name__, name)
 
     Enum.__name__ = name
     for k,v in kwargs.items():
@@ -66,12 +79,67 @@ def enum(name, **kwargs):
     return Enum
 
 def bit_enum(name, **kwargs):
-    Enum = enum(name, **kwargs)
+    ety = ctypes.c_int
+    if 1 << 31 in kwargs.values():
+        ety = ctypes.c_uint
+    class Enum(ctypes.Structure):
+        __slots__ = ()
+        _fields_ = [('value', ety)]
+        _names = {v: k for k, v in kwargs.items()}
 
-    Enum.__or__ = lambda self, other: Enum(self.value | other.value)
-    Enum.__and__ = lambda self, other: Enum(self.value & other.value)
-    Enum.__xor__ = lambda self, other: Enum(self.value ^ other.value)
-    Enum.__invert__ = lambda self: Enum(~self.value)
+        def __hash__(self):
+            return hash(self.value)
+
+        def __eq__(self, other):
+            return self.value == other.value
+
+        def __ne__(self, other):
+            return self.value != other.value
+
+        def __bool__(self):
+            return bool(self.value)
+
+        def __or__(self, other):
+            return Enum(self.value | other.value)
+
+        def __and__(self, other):
+            return Enum(self.value & other.value)
+
+        def __xor__(self, other):
+            return Enum(self.value ^ other.value)
+
+        def __invert__(self):
+            return Enum(~self.value)
+
+        def __repr__(self):
+            value = self.value
+            if not value:
+                return '%s()' % (Enum.__name__)
+            if value < 0:
+                return '~(%r)' % (~self)
+
+            names = list()
+            fail = 0
+
+            itr = 1
+            while value:
+                if value & itr:
+                    try:
+                        name = Enum._names[itr]
+                    except KeyError:
+                        fail |= itr
+                    else:
+                        names.append('%s.%s' % (Enum.__name__, name))
+                    value &= ~itr
+                itr <<= 1
+
+            if fail:
+                names.append('%s(0x%X)' % (Enum.__name__, fail))
+            return ' | '.join(names)
+
+    Enum.__name__ = name
+    for k,v in kwargs.items():
+        setattr(Enum, k, Enum(v))
 
     return Enum
 

@@ -22,16 +22,10 @@ import ctypes
 
 from . import _c
 
-# There are subtle differences between versions.
-# I have not yet investigated what is necessary to support more than one.
-for version in ['3.1']:
-    try:
-        _library = _c.Library('libLLVM-%s.so.1' % version)
-        break
-    except OSError as e:
-        pass
-else:
-    raise e
+import llpy
+del llpy.set_library
+_library = _c.Library(llpy.__library_soname)
+del llpy
 
 
 Bool = ctypes.c_int
@@ -49,35 +43,43 @@ PassRegistry = _c.opaque('PassRegistry')
 Use = _c.opaque('Use')
 
 Attribute = _c.bit_enum('Attribute',
-    ZExt            = 1 << 0,
-    SExt            = 1 << 1,
-    NoReturn        = 1 << 2,
-    InReg           = 1 << 3,
-    StructRet       = 1 << 4,
-    NoUnwind        = 1 << 5,
-    NoAlias         = 1 << 6,
-    ByVal           = 1 << 7,
-    Nest            = 1 << 8,
-    ReadNone        = 1 << 9,
-    ReadOnly        = 1 << 10,
-    NoInline        = 1 << 11,
-    AlwaysInline    = 1 << 12,
-    OptimizeForSize = 1 << 13,
-    StackProtect    = 1 << 14,
-    StackProtectReq = 1 << 15,
-    Alignment       = 31 << 16,
-    NoCapture       = 1 << 21,
-    NoRedZone       = 1 << 22,
-    NoImplicitFloat = 1 << 23,
-    Naked           = 1 << 24,
-    InlineHint      = 1 << 25,
-    StackAlignment  = 7 << 26,
-    ReturnsTwice    = 1 << 29,
-    UWTable         = 1 << 30,
-    NonLazyBind     = 1 << 31,
+    ZExt            = 1 << 0,   # int param, return, call
+    SExt            = 1 << 1,   # int param, return, call
+    NoReturn        = 1 << 2,   # function, call
+    InReg           = 1 << 3,   # param, return, call
+    StructRet       = 1 << 4,   # first, pointer param
+    NoUnwind        = 1 << 5,   # function, call
+    NoAlias         = 1 << 6,   # param, return
+    ByVal           = 1 << 7,   # pointer param
+    Nest            = 1 << 8,   # one pointer param
+    ReadNone        = 1 << 9,   # function, call
+    ReadOnly        = 1 << 10,  # function, call
+    NoInline        = 1 << 11,  # function
+    AlwaysInline    = 1 << 12,  # function
+    OptimizeForSize = 1 << 13,  # function
+    StackProtect    = 1 << 14,  # function
+    StackProtectReq = 1 << 15,  # function
+    Alignment       = 31 << 16, # param, maybe return
+    NoCapture       = 1 << 21,  # pointer param
+    NoRedZone       = 1 << 22,  # function
+    NoImplicitFloat = 1 << 23,  # function
+    Naked           = 1 << 24,  # function
+    InlineHint      = 1 << 25,  # function
+    StackAlignment  = 7 << 26,  # function
+    ReturnsTwice    = 1 << 29,  # function
+    UWTable         = 1 << 30,  # function
+    NonLazyBind_buggy     = 1 << 31,  # function
 
-    #AddressSafety   = 1 << 32,
+    #AddressSafety   = 1 << 32,  # function
 )
+Attribute.__doc__ = '''Attributes are used in at least 3 places:
+    - for function arguments
+    - for function return
+    - for function itself
+    - maybe for instructions too?
+
+    Not all attributes are valid in all places.
+'''
 
 Opcode = _c.enum('Opcode',
     Ret             = 1,
@@ -201,8 +203,8 @@ CallConv = _c.enum('CallConv',
 )
 
 IntPredicate = _c.enum('IntPredicate',
-    EQ = 32,
-    NE = 33,
+    EQ  = 32,
+    NE  = 33,
     UGT = 34,
     UGE = 35,
     ULT = 36,
@@ -214,22 +216,22 @@ IntPredicate = _c.enum('IntPredicate',
 )
 
 RealPredicate = _c.enum('RealPredicate',
-    PredicateFalse  = 0,
-    OEQ             = 1,
-    OGT             = 2,
-    OGE             = 3,
-    OLT             = 4,
-    OLE             = 5,
-    ONE             = 6,
-    ORD             = 7,
-    UNO             = 8,
-    UEQ             = 9,
-    UGT             = 10,
-    UGE             = 11,
-    ULT             = 12,
-    ULE             = 13,
-    UNE             = 14,
-    PredicateTrue   = 15,
+    FALSE   = 0,
+    OEQ     = 1,
+    OGT     = 2,
+    OGE     = 3,
+    OLT     = 4,
+    OLE     = 5,
+    ONE     = 6,
+    ORD     = 7,
+    UNO     = 8,
+    UEQ     = 9,
+    UGT     = 10,
+    UGE     = 11,
+    ULT     = 12,
+    ULE     = 13,
+    UNE     = 14,
+    TRUE    = 15,
 )
 
 LandingPadClauseTy = _c.enum('LandingPadClauseTy',
@@ -556,8 +558,8 @@ AddAlias = _library.function(Value, 'LLVMAddAlias', [Module, Type, Value, ctypes
 
 DeleteFunction = _library.function(None, 'LLVMDeleteFunction', [Value])
 GetIntrinsicID = _library.function(ctypes.c_uint, 'LLVMGetIntrinsicID', [Value])
-GetFunctionCallConv = _library.function(ctypes.c_uint, 'LLVMGetFunctionCallConv', [Value])
-SetFunctionCallConv = _library.function(None, 'LLVMSetFunctionCallConv', [Value, ctypes.c_uint])
+GetFunctionCallConv = _library.function(CallConv, 'LLVMGetFunctionCallConv', [Value])
+SetFunctionCallConv = _library.function(None, 'LLVMSetFunctionCallConv', [Value, CallConv])
 GetGC = _library.function(ctypes.c_char_p, 'LLVMGetGC', [Value])
 SetGC = _library.function(None, 'LLVMSetGC', [Value, ctypes.c_char_p])
 AddFunctionAttr = _library.function(None, 'LLVMAddFunctionAttr', [Value, Attribute])

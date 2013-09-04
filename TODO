@@ -1,0 +1,17 @@
+Bugs in the LLVM C API:
+  - Attribute.NonLazyBind
+Shortcomings of the LLVM C API:
+  - documentation, whitespace
+  - instruction flags: nsw, nuw, inbounds ...
+  - ConstDataSequential subclasses
+  - Attributes beyond 32 bits
+  - Attributes for function return value (not function)
+  - real predicates
+Shortcomings based on insufficient LLVM documentation:
+  - metadata
+  - x86_mmx
+  - BuildStructGEP
+Shortcomings based on sheer laziness:
+  - several of the @untested remaining in core.py
+Shortcomings based on difficulty and scope:
+  - verify the type of all arguments, so that it won't ever crash
