@@ -30,6 +30,9 @@ class ReplaceOutFD:
 class DumpTestCase(unittest.TestCase):
 
     def assertDump(self, obj, str):
+        if _version <= (3, 1):
+            if isinstance(obj, llpy.core.GlobalVariable):
+                str += '\n'
         with ReplaceOutFD(2) as f:
             obj.Dump()
         with f:
@@ -351,13 +354,23 @@ class TestType(DumpTestCase):
 
     if (3, 1) <= _version:
         def test_half(self):
-            self.do_test_real(llpy.core.HalfType, 'half', [
-                ('-inf', '0xFFF0000000000000'),
-                ('-0.0', '0x8000000000000000'),
-                ('0.0', '0x0'),
-                ('1.5', '0x3FF8000000000000'),
-                ('nan', '0x7FF8000000000000'),
-            ])
+            # huh?
+            if _version <= (3, 1):
+                self.do_test_real(llpy.core.HalfType, 'half', [
+                    ('-inf', '0xFFF0000000000000'),
+                    ('-0.0', '0x8000000000000000'),
+                    ('0.0', '0x0'),
+                    ('1.5', '0x3FF8000000000000'),
+                    ('nan', '0x7FF8000000000000'),
+                ])
+            if (3, 2) <= _version:
+                self.do_test_real(llpy.core.HalfType, 'half', [
+                    ('-inf', '0xHFC00'),
+                    ('-0.0', '0xH8000'),
+                    ('0.0', '0xH0000'),
+                    ('1.5', '0xH3E00'),
+                    ('nan', '0xH7E00'),
+                ])
 
     def test_float(self):
         self.do_test_real(llpy.core.FloatType, 'float', [
@@ -396,13 +409,23 @@ class TestType(DumpTestCase):
         ])
 
     def test_ppc_fp128(self):
-        self.do_test_real(llpy.core.PPCFP128Type, 'ppc_fp128', [
-            ('-inf', '0xMFFF00000000000000000000000000000'),
-            ('-0.0', '0xM80000000000000000000000000000000'),
-            ('0.0', '0xM00000000000000000000000000000000'),
-            ('1.5', '0xM3FF00000000000003FF0030000000000'),
-            ('nan', '0xM7FF00000000000000000010000000000'),
-        ])
+        # huh?
+        if _version <= (3, 1):
+            self.do_test_real(llpy.core.PPCFP128Type, 'ppc_fp128', [
+                ('-inf', '0xMFFF00000000000000000000000000000'),
+                ('-0.0', '0xM80000000000000000000000000000000'),
+                ('0.0', '0xM00000000000000000000000000000000'),
+                ('1.5', '0xM3FF00000000000003FF0030000000000'),
+                ('nan', '0xM7FF00000000000000000010000000000'),
+            ])
+        if (3, 2) <= _version:
+            self.do_test_real(llpy.core.PPCFP128Type, 'ppc_fp128', [
+                ('-inf', '0xMFFF00000000000000000000000000000'),
+                ('-0.0', '0xM80000000000000000000000000000000'),
+                ('0.0', '0xM00000000000000000000000000000000'),
+                ('1.5', '0xM3FF80000000000000000000000000000'),
+                ('nan', '0xM7FF80000000000000000000000000000'),
+            ])
 
     def do_test_real(self, tyc, name, values):
         real_type = tyc(self.ctx)
@@ -556,7 +579,6 @@ class TestType(DumpTestCase):
         assert sg.TypeOf() is sp
         self.assertDump(sg,
 '''@recurse = external global %Recurse
-
 ''')
         self.assertDump(mod,
 '''; ModuleID = 'TestType.test_struct_recursive'
@@ -568,7 +590,6 @@ class TestType(DumpTestCase):
         sg.SetInitializer(st.ConstNamedStruct([sg]))
         self.assertDump(sg,
 '''@recurse = global %Recurse { %Recurse* @recurse }
-
 ''')
         self.assertDump(mod,
 '''; ModuleID = 'TestType.test_struct_recursive'
@@ -1027,11 +1048,22 @@ false:                                            ; preds = %entry
         instr.AddCase(i1.ConstAllOnes(), bb_true)
 
         assert instr.GetNumOperands() == 6
+        # wtf?
         assert instr.GetOperand(0) is arg
         assert instr.GetOperand(1) is bb_other
-        assert instr.GetOperand(2) is i1.ConstNull()
+        if _version <= (3, 1):
+            assert instr.GetOperand(2) is i1.ConstNull()
+        if (3, 2) <= _version:
+            v = llpy.core.ConstVector([i1.ConstNull(), i1.ConstNull()])
+            arrv = v.TypeOf().ConstArray([v])
+            assert instr.GetOperand(2) is arrv
         assert instr.GetOperand(3) is bb_false
-        assert instr.GetOperand(4) is i1.ConstAllOnes()
+        if _version <= (3, 1):
+            assert instr.GetOperand(4) is i1.ConstAllOnes()
+        if (3, 2) <= _version:
+            v = llpy.core.ConstVector([i1.ConstAllOnes(), i1.ConstAllOnes()])
+            arrv = v.TypeOf().ConstArray([v])
+            assert instr.GetOperand(4) is arrv
         assert instr.GetOperand(5) is bb_true
 
         self.assertDump(func,
@@ -5075,7 +5107,10 @@ declare i32 @func_decl() %s
         def test_attr_buggy(self):
             # This one *should* fail
             Attribute = llpy.core.Attribute
-            ir = 'nonlazybind address_safety'
+            if _version <= (3, 1):
+                ir = 'nonlazybind address_safety'
+            if (3, 2) <= _version:
+                ir = 'nonlazybind address_safety minsize'
             at = Attribute.NonLazyBind_buggy
             f = self.func_decl
             assert f.GetAttr() == Attribute()
@@ -5096,6 +5131,8 @@ declare i32 @func_decl() %s
         if (3, 1) <= _version:
             attrs |= Attribute.NonLazyBind_buggy
             irs += ' nonlazybind address_safety'
+        if (3, 2) <= _version:
+            irs += ' minsize'
         attrs |= Attribute.StackAlignment
         irs += ' alignstack(64)'
         f = self.func_decl
@@ -5316,10 +5353,10 @@ class TestGlobalVariable(DumpTestCase):
     def test_decl(self):
         assert self.ext.IsDeclaration()
         assert self.ext.GetInitializer() is None
-        self.assertDump(self.ext, '@ext = external global i32\n\n')
+        self.assertDump(self.ext, '@ext = external global i32\n')
         assert not self.ini.IsDeclaration()
         assert self.ini.GetInitializer() is self.i32.ConstInt(42)
-        self.assertDump(self.ini, '@ini = global i32 42\n\n')
+        self.assertDump(self.ini, '@ini = global i32 42\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalVariable'
 
@@ -5327,15 +5364,15 @@ class TestGlobalVariable(DumpTestCase):
 @ini = global i32 42
 ''')
         self.ini.SetInitializer(None)
-        self.assertDump(self.ini, '@ini = external global i32\n\n')
+        self.assertDump(self.ini, '@ini = external global i32\n')
 
     def test_threadlocal(self):
         assert not self.ext.IsThreadLocal()
         self.ext.SetThreadLocal(True)
-        self.assertDump(self.ext, '@ext = external thread_local global i32\n\n')
+        self.assertDump(self.ext, '@ext = external thread_local global i32\n')
         assert not self.ini.IsThreadLocal()
         self.ini.SetThreadLocal(True)
-        self.assertDump(self.ini, '@ini = thread_local global i32 42\n\n')
+        self.assertDump(self.ini, '@ini = thread_local global i32 42\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalVariable'
 
@@ -5346,12 +5383,12 @@ class TestGlobalVariable(DumpTestCase):
     def test_constant(self):
         assert not self.ext.IsConstant()
         self.ext.SetConstant(True)
-        self.assertDump(self.ext, '@ext = external constant i32\n\n')
+        self.assertDump(self.ext, '@ext = external constant i32\n')
         assert self.ext.IsConstant()
         assert not self.ini.IsConstant()
         self.ini.SetConstant(True)
         assert self.ini.IsConstant()
-        self.assertDump(self.ini, '@ini = constant i32 42\n\n')
+        self.assertDump(self.ini, '@ini = constant i32 42\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalVariable'
 
@@ -5364,11 +5401,11 @@ class TestGlobalVariable(DumpTestCase):
         assert self.ext.GetLinkage() == Linkage.External
         self.ext.SetLinkage(Linkage.Private)
         assert self.ext.GetLinkage() == Linkage.Private
-        self.assertDump(self.ext, '@ext = private global i32\n\n')
+        self.assertDump(self.ext, '@ext = private global i32\n')
         assert self.ini.GetLinkage() == Linkage.External
         self.ini.SetLinkage(Linkage.Private)
         assert self.ini.GetLinkage() == Linkage.Private
-        self.assertDump(self.ini, '@ini = private global i32 42\n\n')
+        self.assertDump(self.ini, '@ini = private global i32 42\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalVariable'
 
@@ -5380,11 +5417,11 @@ class TestGlobalVariable(DumpTestCase):
         assert self.ext.GetSection() == ''
         self.ext.SetSection('foo')
         assert self.ext.GetSection() == 'foo'
-        self.assertDump(self.ext, '@ext = external global i32, section "foo"\n\n')
+        self.assertDump(self.ext, '@ext = external global i32, section "foo"\n')
         assert self.ini.GetSection() == ''
         self.ini.SetSection('foo')
         assert self.ini.GetSection() == 'foo'
-        self.assertDump(self.ini, '@ini = global i32 42, section "foo"\n\n')
+        self.assertDump(self.ini, '@ini = global i32 42, section "foo"\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalVariable'
 
@@ -5397,11 +5434,11 @@ class TestGlobalVariable(DumpTestCase):
         assert self.ext.GetVisibility() == Visibility.Default
         self.ext.SetVisibility(Visibility.Hidden)
         assert self.ext.GetVisibility() == Visibility.Hidden
-        self.assertDump(self.ext, '@ext = external hidden global i32\n\n')
+        self.assertDump(self.ext, '@ext = external hidden global i32\n')
         assert self.ini.GetVisibility() == Visibility.Default
         self.ini.SetVisibility(Visibility.Hidden)
         assert self.ini.GetVisibility() == Visibility.Hidden
-        self.assertDump(self.ini, '@ini = hidden global i32 42\n\n')
+        self.assertDump(self.ini, '@ini = hidden global i32 42\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalVariable'
 
@@ -5413,11 +5450,11 @@ class TestGlobalVariable(DumpTestCase):
         assert self.ext.GetAlignment() == 0
         self.ext.SetAlignment(1)
         assert self.ext.GetAlignment() == 1
-        self.assertDump(self.ext, '@ext = external global i32, align 1\n\n')
+        self.assertDump(self.ext, '@ext = external global i32, align 1\n')
         assert self.ini.GetAlignment() == 0
         self.ini.SetAlignment(1)
         assert self.ini.GetAlignment() == 1
-        self.assertDump(self.ini, '@ini = global i32 42, align 1\n\n')
+        self.assertDump(self.ini, '@ini = global i32 42, align 1\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalVariable'
 

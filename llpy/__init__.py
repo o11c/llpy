@@ -33,7 +33,7 @@ __unknown_values = False
 
 # There are subtle differences between versions
 # I have not yet investigated what is necessary to support more than one.
-__library_version = (3, 1)
+__library_version = (3, 2)
 __library_soname = 'libLLVM-%d.%d.so.1' % __library_version
 
 __MIN_LIBRARY_VERSION = (3, 0)
@@ -41,7 +41,7 @@ __MIN_LIBRARY_VERSION = (3, 0)
 __TESTED_LIBRARY_VERSIONS = [
         (3, 0),
         (3, 1),
-        # (3, 2),
+        (3, 2),
         # (3, 3),
         # (3, 4),
 ]

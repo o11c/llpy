@@ -220,6 +220,12 @@ linkages = [
     'AvailableExternally',
     'LinkOnceAny',
     'LinkOnceODR',
+]
+if (3, 2) <= _version:
+    linkages += [
+        'LinkOnceODRAutoHide',
+    ]
+linkages += [
     'WeakAny',
     'WeakODR',
     'Appending',
@@ -232,8 +238,11 @@ linkages = [
     'Common',
     'LinkerPrivate',
     'LinkerPrivateWeak',
-    'LinkerPrivateWeakDefAuto',
 ]
+if _version <= (3, 1):
+    linkages += [
+        'LinkerPrivateWeakDefAuto',
+    ]
 Linkage = _c.enum('Linkage', **{v: k for k, v in enumerate(linkages)})
 del linkages
 
@@ -324,6 +333,8 @@ if _version <= (2, 9):
     DeleteTypeName = _library.function(None, 'LLVMDeleteTypeName', [Module, ctypes.c_char_p])
     GetTypeName = _library.function(ctypes.c_char_p, 'LLVMGetTypeName', [Module, Type])
 DumpModule = _library.function(None, 'LLVMDumpModule', [Module])
+if (3, 2) <= _version:
+    PrintModuleToFile = _library.function(Bool, 'LLVMPrintModuleToFile', [Module, ctypes.c_char_p, ctypes.POINTER(_c.string_buffer)])
 SetModuleInlineAsm = _library.function(None, 'LLVMSetModuleInlineAsm', [Module, ctypes.c_char_p])
 GetModuleContext = _library.function(Context, 'LLVMGetModuleContext', [Module])
 GetTypeByName = _library.function(Type, 'LLVMGetTypeByName', [Module, ctypes.c_char_p])
@@ -685,6 +696,10 @@ if (3, 0) <= _version <= (3, 0) and False:
     # These are declared in the header, but linking finds no such symbol.
     GetMDNodeNumOperands = _library.function(ctypes.c_int, 'LLVMGetMDNodeNumOperands', [Value])
     GetMDNodeOperand = _library.function(Value, 'LLVMGetMDNodeOperand', [Value, ctypes.c_uint]);
+if (3, 2) <= _version:
+    # Actually present now. Slightly different signature.
+    GetMDNodeNumOperands = _library.function(ctypes.c_uint, 'LLVMGetMDNodeNumOperands', [Value])
+    GetMDNodeOperands = _library.function(None, 'LLVMGetMDNodeOperands', [Value, ctypes.POINTER(Value)])
 
 
 BasicBlockAsValue = _library.function(Value, 'LLVMBasicBlockAsValue', [BasicBlock])
