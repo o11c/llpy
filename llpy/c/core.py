@@ -23,9 +23,24 @@ import ctypes
 from . import _c
 
 import llpy
-del llpy.set_library
-_library = _c.Library(llpy.__library_soname)
+del llpy.set_library_pattern
+del llpy.set_llvm_version
 _version = llpy.__library_version
+if _version is not None:
+    _library = _c.Library(llpy.__library_pattern % _version)
+else:
+    e = None
+    for _version in reversed(llpy.__TESTED_LLVM_VERSIONS):
+        try:
+            _library = _c.Library(llpy.__library_pattern % _version)
+        except OSError as e_:
+            e = e_
+            continue
+        else:
+            del e
+            break
+    else:
+        raise e
 del llpy
 
 
