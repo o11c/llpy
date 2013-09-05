@@ -52,6 +52,7 @@ __TESTED_LLVM_VERSIONS = [
 platforms = {
     'linux': 'libLLVM-%d.%d.so.1',
 }
+platforms['linux2'] = platforms['linux'] # python 3.2 and earlier
 
 set_library_pattern(platforms[sys.platform])
 
