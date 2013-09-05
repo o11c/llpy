@@ -84,7 +84,11 @@ if (3, 1) <= _version:
         NonLazyBind_buggy     = 1 << 31,  # function
         #AddressSafety   = 1 << 32,  # function
     )
-Attribute = _c.bit_enum('Attribute', **dict(attributes))
+if (3, 3) <= _version:
+    attributes.update(
+        #StackProtectStrong  = 1 << 33,  # function
+    )
+Attribute = _c.bit_enum('Attribute', **attributes)
 del attributes
 Attribute.__doc__ = '''Attributes are used in at least 3 places:
     - for function arguments
@@ -261,7 +265,7 @@ call_convs = dict(
     X86Stdcall  = 64,
     X86Fastcall = 65,
 )
-CallConv = _c.enum('CallConv', **dict(call_convs))
+CallConv = _c.enum('CallConv', **call_convs)
 
 int_predicates = [
     'EQ',
@@ -307,10 +311,51 @@ if (3, 0) <= _version:
     LandingPadClauseTy = _c.enum('LandingPadClauseTy', **{v: k for k, v in enumerate(landingpad_clause_tys)})
     del landingpad_clause_tys
 
+if (3, 3) <= _version:
+    threadlocal_modes = [
+        'NotThreadLocal',
+        'GeneralDynamic',
+        'LocalDynamic',
+        'InitialExec',
+        'LocalExec',
+    ]
+    ThreadLocalMode = _c.enum('ThreadLocalMode', **{v: k for k, v in enumerate(threadlocal_modes)})
+    del threadlocal_modes
+
+    atomic_orderings = dict(
+        NotAtomic = 0,
+        Unordered = 1,
+        Monotonic = 2,
+        Acquire = 4,
+        Release = 5,
+        AcquireRelease = 6,
+        SequentiallyConsistent = 7,
+    )
+    AtomicOrdering = _c.enum('AtomicOrdering', **atomic_orderings)
+    del atomic_orderings
+
+    atomic_rmw_binops = [
+        'Xchg',
+        'Add',
+        'Sub',
+        'And',
+        'Nand',
+        'Or',
+        'Xor',
+        'Max',
+        'Min',
+        'UMax',
+        'UMin',
+    ]
+    AtomicRMWBinOp = _c.enum('AtomicRMWBinOp', **{v: k for k, v in enumerate(atomic_rmw_binops)})
+    del atomic_rmw_binops
+
 
 
 if (3, 0) <= _version:
     InitializeCore = _library.function(None, 'LLVMInitializeCore', [PassRegistry])
+if (3, 3) <= _version:
+    Shutdown = _library.function(None, 'LLVMShutdown', [])
 DisposeMessage = _library.function(None, 'LLVMDisposeMessage', [_c.string_buffer])
 
 ContextCreate = _library.function(Context, 'LLVMContextCreate', [])
@@ -659,6 +704,11 @@ IsThreadLocal = _library.function(Bool, 'LLVMIsThreadLocal', [Value])
 SetThreadLocal = _library.function(None, 'LLVMSetThreadLocal', [Value, Bool])
 IsGlobalConstant = _library.function(Bool, 'LLVMIsGlobalConstant', [Value])
 SetGlobalConstant = _library.function(None, 'LLVMSetGlobalConstant', [Value, Bool])
+if (3, 3) <= _version:
+    GetThreadLocalMode = _library.function(ThreadLocalMode, 'LLVMGetThreadLocalMode', [Value])
+    SetThreadLocalMode = _library.function(None, 'LLVMSetThreadLocalMode', [Value, ThreadLocalMode])
+    IsExternallyInitialized = _library.function(Bool, 'LLVMIsExternallyInitialized', [Value])
+    SetExternallyInitialized = _library.function(None, 'LLVMSetExternallyInitialized', [Value, Bool])
 
 AddAlias = _library.function(Value, 'LLVMAddAlias', [Module, Type, Value, ctypes.c_char_p])
 
@@ -669,6 +719,8 @@ SetFunctionCallConv = _library.function(None, 'LLVMSetFunctionCallConv', [Value,
 GetGC = _library.function(ctypes.c_char_p, 'LLVMGetGC', [Value])
 SetGC = _library.function(None, 'LLVMSetGC', [Value, ctypes.c_char_p])
 AddFunctionAttr = _library.function(None, 'LLVMAddFunctionAttr', [Value, Attribute])
+if (3, 3) <= _version:
+    AddTargetDependentFunctionAttr = _library.function(None, 'LLVMAddTargetDependentFunctionAttr', [Value, ctypes.c_char_p, ctypes.c_char_p])
 GetFunctionAttr = _library.function(Attribute, 'LLVMGetFunctionAttr', [Value])
 RemoveFunctionAttr = _library.function(None, 'LLVMRemoveFunctionAttr', [Value, Attribute])
 
@@ -874,6 +926,8 @@ BuildInsertValue = _library.function(Value, 'LLVMBuildInsertValue', [Builder, Va
 BuildIsNull = _library.function(Value, 'LLVMBuildIsNull', [Builder, Value, ctypes.c_char_p])
 BuildIsNotNull = _library.function(Value, 'LLVMBuildIsNotNull', [Builder, Value, ctypes.c_char_p])
 BuildPtrDiff = _library.function(Value, 'LLVMBuildPtrDiff', [Builder, Value, Value, ctypes.c_char_p])
+if (3, 3) <= _version:
+    BuildAtomicRMW = _library.function(Value, 'LLVMBuildAtomicRMW', [Builder, AtomicRMWBinOp, Value, Value, AtomicOrdering, Bool])
 
 
 CreateModuleProviderForExistingModule = _library.function(ModuleProvider, 'LLVMCreateModuleProviderForExistingModule', [Module])
@@ -882,7 +936,18 @@ DisposeModuleProvider = _library.function(None, 'LLVMDisposeModuleProvider', [Mo
 
 CreateMemoryBufferWithContentsOfFile = _library.function(Bool, 'LLVMCreateMemoryBufferWithContentsOfFile', [ctypes.c_char_p, ctypes.POINTER(MemoryBuffer), ctypes.POINTER(_c.string_buffer)])
 CreateMemoryBufferWithSTDIN = _library.function(Bool, 'LLVMCreateMemoryBufferWithSTDIN', [ctypes.POINTER(MemoryBuffer), ctypes.POINTER(_c.string_buffer)])
+if (3, 3) <= _version:
+    CreateMemoryBufferWithMemoryRange = _library.function(MemoryBuffer, 'LLVMCreateMemoryBufferWithMemoryRange', [_c.string_buffer, ctypes.c_size_t, ctypes.c_char_p, Bool]);
+    CreateMemoryBufferWithMemoryRangeCopy = _library.function(MemoryBuffer, 'LLVMCreateMemoryBufferWithMemoryRangeCopy', [_c.string_buffer, ctypes.c_size_t, ctypes.c_char_p]);
+    GetBufferStart = _library.function(_c.string_buffer, 'LLVMGetBufferStart', [MemoryBuffer]);
+    GetBufferSize = _library.function(ctypes.c_size_t, 'LLVMGetBufferSize', [MemoryBuffer]);
 DisposeMemoryBuffer = _library.function(None, 'LLVMDisposeMemoryBuffer', [MemoryBuffer])
+
+
+if (3, 3) <= _version:
+    _library.function(Bool, 'LLVMStartMultithreaded', [])
+    _library.function(None, 'LLVMStopMultithreaded', [])
+    _library.function(Bool, 'LLVMIsMultithreaded', [])
 
 
 GetGlobalPassRegistry = _library.function(PassRegistry, 'LLVMGetGlobalPassRegistry', [])

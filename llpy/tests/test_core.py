@@ -391,13 +391,22 @@ class TestType(DumpTestCase):
         ])
 
     def test_x86_fp80(self):
-        self.do_test_real(llpy.core.X86FP80Type, 'x86_fp80', [
-            ('-inf', '0xKFFFF8000000000000000'),
-            ('-0.0', '0xK80000000000000000000'),
-            ('0.0', '0xK00000000000000000000'),
-            ('1.5', '0xK3FFFC000000000000000'),
-            ('nan', '0xK7FFF4000000000000000'),
-        ])
+        if _version <= (3, 2):
+            self.do_test_real(llpy.core.X86FP80Type, 'x86_fp80', [
+                ('-inf', '0xKFFFF8000000000000000'),
+                ('-0.0', '0xK80000000000000000000'),
+                ('0.0', '0xK00000000000000000000'),
+                ('1.5', '0xK3FFFC000000000000000'),
+                ('nan', '0xK7FFF4000000000000000'),
+            ])
+        if (3, 3) <= _version:
+            self.do_test_real(llpy.core.X86FP80Type, 'x86_fp80', [
+                ('-inf', '0xKFFFF8000000000000000'),
+                ('-0.0', '0xK80000000000000000000'),
+                ('0.0', '0xK00000000000000000000'),
+                ('1.5', '0xK3FFFC000000000000000'),
+                ('nan', '0xK7FFFC000000000000000'),
+            ])
 
     def test_fp128(self):
         self.do_test_real(llpy.core.FP128Type, 'fp128', [
@@ -3788,21 +3797,24 @@ class TestArgument(DumpTestCase):
         assert brg.GetPreviousParam() is arg
         assert self.func.GetParams() == [arg, brg]
 
-    def test_attr(self):
-        Attribute = llpy.core.Attribute
-        attrs = [
-                ('zeroext', Attribute.ZExt),
-                ('signext', Attribute.SExt),
-                ('inreg', Attribute.InReg),
-                ('sret', Attribute.StructRet),
-                ('noalias', Attribute.NoAlias),
-                ('byval', Attribute.ByVal),
-                ('nest', Attribute.Nest),
-                ('nocapture', Attribute.NoCapture),
-        ]
+    Attribute = llpy.core.Attribute
+    attrs = [
+            ('zeroext', Attribute.ZExt),
+            ('signext', Attribute.SExt),
+            ('inreg', Attribute.InReg),
+            ('noalias', Attribute.NoAlias),
+            ('nocapture', Attribute.NoCapture),
+            ('sret', Attribute.StructRet),
+            ('byval', Attribute.ByVal),
+            ('nest', Attribute.Nest),
+    ]
+    del Attribute
+    if (3, 3) <= _version:
+        attrs.sort()
 
+    def test_attr(self):
         arg = self.func.GetParam(0)
-        for ir, at in attrs:
+        for ir, at in self.attrs:
             arg.AddAttribute(at)
             assert arg.GetAttribute() == at
             self.assertDump(self.func,
@@ -3815,17 +3827,19 @@ define void @func(i32 %s %%arg, i32 %%brg) {
             arg.RemoveAttribute(at)
 
     def test_allattr(self):
-        At = llpy.core.Attribute
-        attrs = At.ZExt | At.SExt | At.InReg | At.StructRet | At.NoAlias | At.ByVal | At.Nest | At.NoCapture | At.Alignment
+        Attribute = llpy.core.Attribute
+        attrs = reduce(operator.or_, (at for ir, at in self.attrs))
+        attrs |= Attribute.Alignment
+        ir = ' '.join(ir for ir, at in self.attrs)
         arg = self.func.GetParam(0)
         arg.AddAttribute(attrs)
         self.assertDump(self.func,
 '''
-define void @func(i32 zeroext signext inreg noalias nocapture sret byval nest align 1073741824 %arg, i32 %brg) {
+define void @func(i32 %s align 1073741824 %%arg, i32 %%brg) {
   ret void
 }
 
-''')
+''' % ir)
 
     def test_align(self):
         arg = self.func.GetParam(0)
@@ -5070,6 +5084,8 @@ define void @func_def() {
         attrs += [
             ('nonlazybind', Attribute.NonLazyBind),
         ]
+    if (3, 3) <= _version:
+        attrs.sort()
     del Attribute
 
     def test_attr(self):
@@ -5079,9 +5095,17 @@ define void @func_def() {
         for ir, at in self.attrs:
             f.AddAttr(at)
             assert f.GetAttr() == at
-            self.assertDump(f,
+            if _version <= (3, 2):
+                self.assertDump(f,
 '''
 declare i32 @func_decl() %s
+
+''' % ir)
+            if (3, 3) <= _version:
+                self.assertDump(f,
+'''
+; Function Attrs: %s
+declare i32 @func_decl() #0
 
 ''' % ir)
             f.RemoveAttr(at)
@@ -5109,16 +5133,26 @@ declare i32 @func_decl() %s
             Attribute = llpy.core.Attribute
             if _version <= (3, 1):
                 ir = 'nonlazybind address_safety'
-            if (3, 2) <= _version:
+            if (3, 2) <= _version <= (3, 2):
                 ir = 'nonlazybind address_safety minsize'
+            if (3, 3) <= _version:
+                ir = 'minsize nobuiltin noduplicate nonlazybind returned sspstrong sanitize_address sanitize_thread sanitize_memory'
             at = Attribute.NonLazyBind_buggy
             f = self.func_decl
             assert f.GetAttr() == Attribute()
             f.AddAttr(at)
             assert f.GetAttr() == at
-            self.assertDump(f,
+            if _version <= (3, 2):
+                self.assertDump(f,
 '''
 declare i32 @func_decl() %s
+
+''' % ir)
+            if (3, 3) <= _version:
+                self.assertDump(f,
+'''
+; Function Attrs: %s
+declare i32 @func_decl() #0
 
 ''' % ir)
             f.RemoveAttr(at)
@@ -5130,16 +5164,30 @@ declare i32 @func_decl() %s
         irs = ' '.join(ir for ir, at in self.attrs)
         if (3, 1) <= _version:
             attrs |= Attribute.NonLazyBind_buggy
-            irs += ' nonlazybind address_safety'
+            irs += ' nonlazybind'
+        if (3, 1) <= _version <= (3, 2):
+            irs += ' address_safety'
         if (3, 2) <= _version:
             irs += ' minsize'
+        if (3, 3) <= _version:
+            irs += ' nobuiltin noduplicate returned sspstrong'
+            irs = ' '.join(sorted(irs.split(' ')))
+            irs = irs.replace('uwtable', 'sanitize_address sanitize_thread sanitize_memory uwtable')
         attrs |= Attribute.StackAlignment
         irs += ' alignstack(64)'
         f = self.func_decl
         f.AddAttr(attrs)
-        self.assertDump(f,
+        if _version <= (3, 2):
+            self.assertDump(f,
 '''
 declare i32 @func_decl() %s
+
+''' % irs)
+        if (3, 3) <= _version:
+            self.assertDump(f,
+'''
+; Function Attrs: %s
+declare i32 @func_decl() #0
 
 ''' % irs)
 
@@ -5152,9 +5200,17 @@ declare i32 @func_decl() %s
             at = Attribute(x)
             f.AddAttr(at)
             assert f.GetAttr() == at
-            self.assertDump(f,
+            if _version <= (3, 2):
+                self.assertDump(f,
 '''
 declare i32 @func_decl() alignstack(%d)
+
+''' % n)
+            if (3, 3) <= _version:
+                self.assertDump(f,
+'''
+; Function Attrs: alignstack(%d)
+declare i32 @func_decl() #0
 
 ''' % n)
             f.RemoveAttr(at)
@@ -5168,9 +5224,17 @@ declare i32 @func_decl() alignstack(%d)
         f.SetLinkage(llpy.core.Linkage.Private)
         f.SetSection('section')
         f.SetVisibility(llpy.core.Visibility.Hidden)
-        self.assertDump(self.func_decl,
+        if _version <= (3, 2):
+            self.assertDump(self.func_decl,
 '''
 declare private hidden fastcc i32 @func_decl() noreturn section "section" align 1 gc "gc"
+
+''')
+        if (3, 3) <= _version:
+            self.assertDump(self.func_decl,
+'''
+; Function Attrs: noreturn
+declare private hidden fastcc i32 @func_decl() #0 section "section" align 1 gc "gc"
 
 ''')
 
