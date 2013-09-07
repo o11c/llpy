@@ -16,6 +16,8 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ''' Wrap the C interface to the llvm Core.
+
+    Some classes include functions from headers other than llvm-c/Core.h
 '''
 
 import ctypes # some wrappers need to know
@@ -23,7 +25,11 @@ import sys
 import weakref
 
 from llpy.utils import u2b, b2u, deprecated, untested, dangerous
-from llpy.c import core as _core, _c
+from llpy.c import (
+        _c,
+        core as _core,
+        analysis as _analysis,
+)
 # enums are already good enough
 from llpy.c.core import (
         Attribute,
@@ -37,6 +43,9 @@ from llpy.c.core import (
         LandingPadClauseTy,
 
         _version,
+)
+from llpy.c.analysis import (
+        VerifierFailureAction,
 )
 from llpy import __unknown_values as unknown_values
 
@@ -209,6 +218,21 @@ class Module:
 
     def AddAlias(self, ty, val, name):
         return Value(_core.AddAlias(self._raw, ty._raw, val._raw, u2b(name)), self._context)
+
+    # from Analysis.h
+    def Verify(self, action):
+        ''' Verifies that a module is valid, taking the specified action if
+            not. Optionally returns a human-readable description of any
+            invalid constructs. OutMessage must be disposed with
+            LLVMDisposeMessage.
+        '''
+        error = _c.string_buffer()
+        rv = bool(_analysis.VerifyModule(self._raw, action, ctypes.byref(error)))
+        error = _message_to_string(error)
+
+        if rv:
+            raise OSError(error)
+
 
 
 class Type:
@@ -1745,6 +1769,28 @@ class    Function(GlobalValue):
         '''
         return Value(_core.BasicBlockAsValue(_core.AppendBasicBlockInContext(self._context._raw, self._raw, u2b(name))), self._context)
 
+    # from Analysis.h
+    def Verify(self, action):
+        ''' Verifies that a single function is valid, taking the specified
+            action. Useful for debugging.
+        '''
+        rv = bool(_analysis.VerifyFunction(self._raw, action))
+
+        if rv:
+            raise OSError
+
+    def ViewCFG(self):
+        ''' Open up a ghostview window that displays the CFG of the current
+            function, including instructions. Useful for debugging.
+        '''
+        _analysis.ViewFunctionCFG(self._raw)
+
+    def ViewCFGOnly(self):
+        ''' Open up a ghostview window that displays the CFG of the current
+            function, with just the blocks. Useful for debugging.
+        '''
+        _analysis.ViewFunctionCFGOnly(self._raw)
+
 class    GlobalAlias(GlobalValue):
     __slots__ = ()
 
@@ -2507,7 +2553,6 @@ class ModuleProvider:
     #def __del__(self):
     #    _core.DisposeModuleProvider(self._raw)
 
-@untested
 def _message_to_string(message):
     ''' Convert an LLVM "message" to a python string, freeing the C version
     '''
@@ -2528,9 +2573,9 @@ class MemoryBuffer:
             rv = bool(_core.CreateMemoryBufferWithContentsOfFile(u2b(filename), ctypes.byref(self._raw), ctypes.byref(error)))
         else:
             rv = bool(_core.CreateMemoryBufferWithSTDIN(ctypes.byref(self._raw), ctypes.byref(error)))
+        error = _message_to_string(error)
 
         if rv:
-            error = _message_to_string(error)
             raise OSError(error)
 
     @untested

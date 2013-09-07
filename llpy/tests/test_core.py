@@ -260,6 +260,13 @@ declare void @foo()
 @anon_alias = alias i32 -1
 ''')
 
+    def test_verify(self):
+        self.mod.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
+        i32 = llpy.core.IntegerType(self.ctx, 32)
+        self.mod.AddAlias(i32, i32.ConstNull(), 'foo')
+        with self.assertRaises(OSError):
+            self.mod.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
+
     def tearDown(self):
         del self.mod
         del self.ctx
@@ -5237,6 +5244,21 @@ declare private hidden fastcc i32 @func_decl() noreturn section "section" align 
 declare private hidden fastcc i32 @func_decl() #0 section "section" align 1 gc "gc"
 
 ''')
+
+    def test_verify(self):
+        i32 = self.i32
+        i8 = llpy.core.IntegerType(self.ctx, 8)
+        i8p = llpy.core.PointerType(i8)
+        printf_type = llpy.core.FunctionType(i32, [i8p], True)
+        printf = self.mod.AddFunction(printf_type, 'printf')
+        bb = printf.AppendBasicBlock()
+        irb = llpy.core.IRBuilder(self.ctx)
+        irb.PositionBuilderAtEnd(bb)
+        irb.BuildRet(i32.ConstNull())
+        printf.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
+        printf.SetCallConv(llpy.core.CallConv.Fast)
+        with self.assertRaises(OSError):
+            printf.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
 
     def tearDown(self):
         del self.func_decl
