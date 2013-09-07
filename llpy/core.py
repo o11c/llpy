@@ -2556,6 +2556,8 @@ class ModuleProvider:
 def _message_to_string(message):
     ''' Convert an LLVM "message" to a python string, freeing the C version
     '''
+    if not message:
+        return None
     s = ctypes.cast(message, ctypes.c_char_p).value
     # Don't panic.
     _core.DisposeMessage(message)
@@ -2564,7 +2566,6 @@ def _message_to_string(message):
 class MemoryBuffer:
     __slots__ = ('_raw',)
 
-    @untested
     def __init__(self, filename):
         self._raw = raw = _core.MemoryBuffer()
         error = _c.string_buffer()
@@ -2578,7 +2579,6 @@ class MemoryBuffer:
         if rv:
             raise OSError(error)
 
-    @untested
     def __del__(self):
         _core.DisposeMemoryBuffer(self._raw)
 

@@ -5717,21 +5717,6 @@ class TestModuleProvider(unittest.TestCase):
 
 
 @unittest.skip('NYI')
-class TestMemoryBuffer(unittest.TestCase):
-
-    def test_stdin(self):
-        with ReplaceInFD(0) as f:
-            f.write('contents')
-            mbuf = llpy.core.MemoryBuffer(None)
-
-    def test_file(self):
-        mbuf = llpy.core.MemoryBuffer('filename')
-
-    def test_error(self):
-        with self.assertRaises(OSError):
-            llpy.core.MemoryBuffer('no-such-file')
-
-@unittest.skip('NYI')
 class TestPassRegistry(unittest.TestCase):
 
     def test_singleton(self):
