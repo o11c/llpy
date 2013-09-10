@@ -29,6 +29,7 @@ from llpy.c import (
         _c,
         core as _core,
         analysis as _analysis,
+        initialization as _initialization,
 )
 # enums are already good enough
 from llpy.c.core import (
@@ -2598,9 +2599,57 @@ class PassRegistry:
         except AttributeError:
             pass
         raw = _core.GetGlobalPassRegistry()
-        # I don't know what this does, but it looks important.
-        _core.InitializeCore(raw)
         PassRegistry.singleton_instance = PassRegistry(raw)
+
+    @untested
+    def InitializeCore(self):
+        _initialization.InitializeCore(self._raw)
+    @untested
+    def InitializeTransformUtils(self):
+        _initialization.InitializeTransformUtils(self._raw)
+
+    @untested
+    def InitializeScalarOpts(self):
+        _initialization.InitializeScalarOpts(self._raw)
+
+    if (3, 3) <= _version:
+        @untested
+        def InitializeObjCARCOpts(self):
+            _initialization.InitializeObjCARCOpts(self._raw)
+
+    if (3, 1) <= _version:
+        @untested
+        def InitializeVectorization(self):
+            _initialization.InitializeVectorization(self._raw)
+
+    @untested
+    def InitializeInstCombine(self):
+        _initialization.InitializeInstCombine(self._raw)
+
+    @untested
+    def InitializeIPO(self):
+        _initialization.InitializeIPO(self._raw)
+
+    @untested
+    def InitializeInstrumentation(self):
+        _initialization.InitializeInstrumentation(self._raw)
+
+    @untested
+    def InitializeAnalysis(self):
+        _initialization.InitializeAnalysis(self._raw)
+
+    @untested
+    def InitializeIPA(self):
+        _initialization.InitializeIPA(self._raw)
+
+    @untested
+    def InitializeCodeGen(self):
+        _initialization.InitializeCodeGen(self._raw)
+
+    @untested
+    def InitializeTarget(self):
+        _initialization.InitializeTarget(self._raw)
+
 
 class PassManagerBase:
     __slots__ = ('_raw',)
