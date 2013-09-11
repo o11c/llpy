@@ -204,7 +204,7 @@ class Module:
         return Value(_core.GetLastFunction(self._raw), self._context)
     # see class Function for next/prev
 
-    def AddGlobal(self, ty, name, address_space=0):
+    def AddGlobal(self, ty, name='', address_space=0):
         return Value(_core.AddGlobalInAddressSpace(self._raw, ty._raw, u2b(name), address_space), self._context)
 
     def GetNamedGlobal(self, name):

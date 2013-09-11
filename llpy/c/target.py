@@ -23,36 +23,9 @@ import ctypes
 from . import _c
 
 from .core import _library, _version
-from .core import Bool
-from .core import Context
-from .core import Module
 from .core import Type
-if _version <= (2, 9):
-    from .core import TypeHandle
 from .core import Value
-from .core import BasicBlock
-from .core import Builder
-from .core import ModuleProvider
-from .core import MemoryBuffer
 from .core import PassManager
-from .core import PassRegistry
-from .core import Use
-
-from .core import Attribute
-from .core import Opcode
-from .core import TypeKind
-from .core import Linkage
-from .core import Visibility
-from .core import CallConv
-from .core import IntPredicate
-from .core import RealPredicate
-if (3, 0) <= _version:
-    from .core import LandingPadClauseTy
-
-if (3, 3) <= _version:
-    from .core import ThreadLocalMode
-    from .core import AtomicOrdering
-    from .core import AtomicRMWBinOp
 
 
 byte_orderings = [
@@ -73,7 +46,7 @@ ALL_TARGETS = set()
 if (3, 1) <= _version:
     ALL_ASM_PRINTERS = set()
     ALL_ASM_PARSERS = set()
-    ALL_ASM_DISASSEMBLERS = set()
+    ALL_DISASSEMBLERS = set()
 
 def add_target(target):
     # assumption: a target must exist in order to have asm printers, etc.
@@ -109,7 +82,7 @@ def add_target(target):
         try:
             name = 'Initialize%sDisassembler' % target
             globals()[name] = _library.function(None, 'LLVM%s' % name, [])
-            ALL_ASM_DISASSEMBLERS.add(target)
+            ALL_DISASSEMBLERS.add(target)
         except AttributeError:
             pass
 
@@ -137,35 +110,51 @@ for target in [
     'X86',
 ]:
     add_target(target)
+del target
 
 def InitializeAllTargetInfos():
-    'synthesized'
+    ''' The main program should call this function if it wants access to
+        all available targets that LLVM is configured to support.
+    '''
     for target in ALL_TARGETS:
         globals()['Initialize%sTargetInfo' % target]()
 
-def InitializeAllTarget():
-    'synthesized'
+def InitializeAllTargets():
+    ''' The main program should call this function if it wants to link in
+        all available targets that LLVM is configured to support.
+    '''
     for target in ALL_TARGETS:
         globals()['Initialize%sTarget' % target]()
 
 if (3, 1) <= _version:
-    def InitializeAllTargetMC():
-        'synthesized'
+    def InitializeAllTargetMCs():
+        ''' The main program should call this function if it wants access
+            to all available target MC that LLVM is configured to support.
+        '''
         for target in ALL_TARGETS:
             globals()['Initialize%sTargetMC' % target]()
 
     def InitializeAllAsmPrinters():
-        'synthesized'
+        ''' The main program should call this function if it wants all
+            asm printers that LLVM is configured to support, to make them
+            available via the TargetRegistry.
+        '''
         for target in ALL_ASM_PRINTERS:
             globals()['Initialize%sAsmPrinter' % target]()
 
     def InitializeAllAsmParsers():
-        'synthesized'
+        ''' The main program should call this function if it wants all
+            asm parsers that LLVM is configured to support, to make them
+            available via the TargetRegistry.
+        '''
         for target in ALL_ASM_PARSERS:
             globals()['Initialize%sAsmParser' % target]()
 
     def InitializeAllDisassemblers():
-        'synthesized'
+        ''' The main program should call this function if it wants all
+            disassemblers that LLVM is configured to support, to make them
+            available via the TargetRegistry.
+        '''
         for target in ALL_DISASSEMBLERS:
             globals()['Initialize%sDisassembler' % target]()
 
