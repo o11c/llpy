@@ -20,14 +20,18 @@
 
 import ctypes
 
-from llpy.utils import u2b, untested
+from llpy.utils import b2u, u2b, untested
 from llpy.c import (
+        _c,
         core as _core,
         target as _target,
+        target_machine as _machine,
 )
 from llpy.core import (
         _message_to_string,
         _version,
+
+        MemoryBuffer,
 )
 from llpy.c.target import ByteOrdering
 
@@ -181,3 +185,109 @@ if (3, 1) <= _version:
     InitializeAllAsmParsers = untested(InitializeAllAsmParsers)
     from llpy.c.target import InitializeAllDisassemblers
     InitializeAllDisassemblers = untested(InitializeAllDisassemblers)
+
+
+if (3, 1) <= _version:
+
+    from llpy.c.target_machine import (
+            CodeGenOptLevel,
+            RelocMode,
+            CodeModel,
+            CodeGenFileType,
+    )
+
+    class Target:
+        __slots__ = ('_raw')
+
+        @untested
+        def __new__(cls, raw):
+            assert cls is Target
+            assert isinstance(raw, _machine.Target)
+            if raw:
+                self = object.__new__(Target)
+                self._raw = raw
+                return self
+            else:
+                return None
+
+        @staticmethod
+        @untested
+        def GetFirst():
+            return Target(_machine.GetFirstTarget())
+
+        @untested
+        def GetNext(self):
+            return Target(_machine.GetNextTarget(self._raw))
+
+        @untested
+        def Name(self):
+            return b2u(_machine.GetTargetName(self._raw))
+
+        @untested
+        def Description(self):
+            return b2u(_machine.GetTargetDescription(self._raw))
+
+        @untested
+        def HasJIT(self):
+            return bool(_machine.TargetHasJIT(self._raw))
+
+        @untested
+        def HasTargetMachine(self):
+            return bool(_machine.TargetHasTargetMachine(self._raw))
+
+        @untested
+        def HasAsmBackend(self):
+            return bool(_machine.TargetHasAsmBackend(self._raw))
+
+    class TargetMachine:
+
+        @untested
+        def __init__(self, target, triple, cpu, features, opt, reloc, codemodel):
+            self._raw = _machine.CreateTargetMachine(target._raw, u2b(triple), u2b(cpu), u2b(features), opt, reloc, codemodel)
+
+        @untested
+        def __del__(self):
+            _machine.DisposeTargetMachine(self._raw)
+
+        @untested
+        def Target(self):
+            return Target(_machine.GetTargetMachineTarget(self._raw))
+
+        @untested
+        def Triple(self):
+            return _message_to_string(_machine.GetTargetMachineTriple(self._raw))
+
+        @untested
+        def CPU(self):
+            return _message_to_string(_machine.GetTargetMachineCPU(self._raw))
+
+        @untested
+        def FeatureString(self):
+            return _message_to_string(_machine.GetTargetMachineFeatureString(self._raw))
+
+        @untested
+        def TargetData(self):
+            raw_td = _machine.GetTargetMachineData(self._raw)
+            # create a new TargetData with the same info to avoid ownership problems
+            return TargetData(_message_to_string(_target.CopyStringRepOfTargetData(raw_td)))
+
+        @untested
+        def EmitToFile(self, mod, filename, codegen):
+            error = _c.string_buffer()
+            rv = bool(_machine.TargetMachineEmitToFile(self._raw, mod._raw, u2b(filename), codegen, ctypes.byref(error)))
+            error = _message_to_string(error)
+            if rv:
+                raise OSError(error)
+
+        if (3, 3) <= _version:
+            @untested
+            def EmitToMemoryBuffer(self, mod, codegen):
+                error = _c.string_buffer()
+                raw_mb = _core.MemoryBuffer()
+                rv = bool(_machine.TargetMachineEmitToMemoryBuffer(self._raw, mod._raw, codegen, ctypes.byref(error), ctypes.byref(raw_mb)))
+                error = _message_to_string(error)
+                if rv:
+                    raise OSError(error)
+                mb = object.__new__(MemoryBuffer)
+                mb._raw = raw_mb
+                return mb

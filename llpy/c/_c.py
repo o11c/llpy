@@ -147,7 +147,6 @@ string_buffer = ctypes.POINTER(ctypes.c_char)
 
 def buffer_as_bytes(sb, n):
     return ctypes.cast(sb, ctypes.POINTER(ctypes.c_char * n)).contents.raw
-# for the reverse, the implicit conversion is enough
 
 def pointer_value(ptr):
     return ctypes.cast(ctypes.pointer(ptr),
