@@ -18,8 +18,6 @@
 ''' low-level wrapper of llvm-c/Initialization.h
 '''
 
-import ctypes
-
 from .core import _library, _version
 from .core import PassRegistry
 

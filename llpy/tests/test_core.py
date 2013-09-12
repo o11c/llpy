@@ -2512,7 +2512,6 @@ define void @func(i32 %arg) {
 
     def test_BuildGEP(self):
         builder = self.builder
-        void = llpy.core.VoidType(self.ctx)
         i32 = llpy.core.IntegerType(self.ctx, 32)
         i64 = llpy.core.IntegerType(self.ctx, 64)
         i32p = llpy.core.PointerType(i32)
@@ -2591,7 +2590,6 @@ define i32* @func({ [2 x i32] }* %ptr, i32 %idx) {
 
     def test_BuildInBoundsGEP(self):
         builder = self.builder
-        void = llpy.core.VoidType(self.ctx)
         i32 = llpy.core.IntegerType(self.ctx, 32)
         i64 = llpy.core.IntegerType(self.ctx, 64)
         i32p = llpy.core.PointerType(i32)
@@ -2713,7 +2711,6 @@ define [14 x i8]* @func() {
     def test_BuildGlobalStringPtr(self):
         builder = self.builder
         i8 = llpy.core.IntegerType(self.ctx, 8)
-        i8a = llpy.core.ArrayType(i8, 14)
         i8p = llpy.core.PointerType(i8)
         func_type = llpy.core.FunctionType(i8p, [])
         func = self.mod.AddFunction(func_type, 'func')
@@ -3309,10 +3306,10 @@ define i1 @{op}(i2 %lhs, i2 %rhs) {{
 
             if False: # build and const differ here
                 if pred == llpy.core.RealPredicate.FALSE:
-                    assert cne is self.false
+                    assert instr is self.false
                     continue
                 if pred == llpy.core.RealPredicate.TRUE:
-                    assert cne is self.true
+                    assert instr is self.true
                     continue
 
             assert instr.GetNumOperands() == 2
@@ -3751,6 +3748,19 @@ define i1 @func(i1* %arg) {
         diff = instr.GetOperand(0)
         size = instr.GetOperand(1)
         assert size is i64.SizeOf()
+
+        assert isinstance(diff, llpy.core.BinaryOperator)
+        assert diff.GetInstructionOpcode() == llpy.core.Opcode.Sub
+        assert diff.GetNumOperands() == 2
+        lhs_ = diff.GetOperand(0)
+        rhs_ = diff.GetOperand(1)
+
+        assert isinstance(lhs_, llpy.core.PtrToIntInst)
+        assert isinstance(rhs_, llpy.core.PtrToIntInst)
+        assert lhs_.GetNumOperands() == 1
+        assert rhs_.GetNumOperands() == 1
+        assert lhs_.GetOperand(0) is lhs
+        assert rhs_.GetOperand(0) is rhs
 
         builder.BuildRet(instr)
         self.assertDump(func,
@@ -4664,7 +4674,6 @@ class TestConstant(DumpTestCase):
         self.assertDump(cne, 'i64 select (%s, %s, %s)\n' % (xb_dump, self.xi1_dump, self.xi8_dump))
 
     def test_ConstExtractElement(self):
-        i64v = llpy.core.VectorType(self.i64, 2)
         vec12 = llpy.core.ConstVector([self.int1, self.int2])
         xvec = llpy.core.ConstVector([self.xi1, self.xi8])
         cnv = vec12.ConstExtractElement(self.i64.ConstNull())
@@ -4679,7 +4688,6 @@ class TestConstant(DumpTestCase):
         self.assertDump(cne, 'i64 extractelement (<2 x i64> <%s, %s>, %s)\n' % (self.xi1_dump, self.xi8_dump, self.xi1_dump))
 
     def test_ConstInsertElement(self):
-        i64v = llpy.core.VectorType(self.i64, 2)
         vec12 = llpy.core.ConstVector([self.int1, self.int2])
         xvec = llpy.core.ConstVector([self.xi1, self.xi8])
         cnv = vec12.ConstInsertElement(self.i64.ConstNull(), self.int1)
@@ -4693,31 +4701,19 @@ class TestConstant(DumpTestCase):
         self.assertDump(cne, '<2 x i64> insertelement (<2 x i64> <%s, %s>, %s, %s)\n' % (self.xi1_dump, self.xi8_dump, self.xi8_dump, self.xi1_dump))
 
     def test_ConstShuffleVector(self):
-        i1 = self.i1
         i2 = llpy.core.IntegerType(self.ctx, 2)
         i3 = llpy.core.IntegerType(self.ctx, 3)
         i4 = llpy.core.IntegerType(self.ctx, 4)
         i32 = llpy.core.IntegerType(self.ctx, 32)
         i64 = self.i64
-        v2t = llpy.core.VectorType(i64, 2)
-        v4t = llpy.core.VectorType(i64, 4)
-        v4s = llpy.core.VectorType(i2, 4)
         xi1 = self.xi1
         xi2 = i2.SizeOf()
         xi3 = i3.SizeOf()
         xi4 = i4.SizeOf()
-        xi1_dump = self.xi1_dump
-        xi2_dump = 'i64 ptrtoint (i2* getelementptr (i2* null, i32 1) to i64)'
-        xi3_dump = 'i64 ptrtoint (i3* getelementptr (i3* null, i32 1) to i64)'
-        xi4_dump = 'i64 ptrtoint (i4* getelementptr (i4* null, i32 1) to i64)'
-        ii1 = xi1.ConstTrunc(i32)
-        ii2 = xi2.ConstTrunc(i32)
-        ii3 = xi3.ConstTrunc(i32)
-        ii4 = xi4.ConstTrunc(i32)
-        ii1_dump = xi1_dump.replace('i64', 'i32')
-        ii2_dump = xi2_dump.replace('i64', 'i32')
-        ii3_dump = xi3_dump.replace('i64', 'i32')
-        ii4_dump = xi4_dump.replace('i64', 'i32')
+        #xi1_dump = self.xi1_dump
+        #xi2_dump = 'i64 ptrtoint (i2* getelementptr (i2* null, i32 1) to i64)'
+        #xi3_dump = 'i64 ptrtoint (i3* getelementptr (i3* null, i32 1) to i64)'
+        #xi4_dump = 'i64 ptrtoint (i4* getelementptr (i4* null, i32 1) to i64)'
         a = i64.ConstInt(~0)
         b = i64.ConstInt(~1)
         c = i64.ConstInt(~2)
@@ -4730,12 +4726,12 @@ class TestConstant(DumpTestCase):
         v2 = llpy.core.ConstVector([c, d])
         vr = llpy.core.ConstVector([a, c, d, b])
         mask = llpy.core.ConstVector([e, g, h, f])
-        mask_dump = '<4 x i32> <i32 0, i32 2, i32 3, i32 1>'
+        #mask_dump = '<4 x i32> <i32 0, i32 2, i32 3, i32 1>'
         xv1 = llpy.core.ConstVector([xi1, xi2])
         xv2 = llpy.core.ConstVector([xi3, xi4])
         xvr = llpy.core.ConstVector([xi1, xi3, xi4, xi2])
-        xv1_dump = '<2 x i64> <%s, %s>' % (xi1_dump, xi2_dump)
-        xv2_dump = '<2 x i64> <%s, %s>' % (xi3_dump, xi4_dump)
+        #xv1_dump = '<2 x i64> <%s, %s>' % (xi1_dump, xi2_dump)
+        #xv2_dump = '<2 x i64> <%s, %s>' % (xi3_dump, xi4_dump)
         cnv = v1.ConstShuffleVector(v2, mask)
         assert cnv is vr
         cne = xv1.ConstShuffleVector(xv2, mask)
@@ -4749,13 +4745,11 @@ class TestConstant(DumpTestCase):
         assert cne is xvr
 
     def test_ConstExtractValue(self):
-        a = llpy.core.ArrayType(self.i64, 2)
-        s = llpy.core.StructType(self.ctx, [a], None)
         av = self.i64.ConstArray([self.int1, self.int2])
         sv = self.ctx.ConstStruct([av])
         xav = self.i64.ConstArray([self.xi1, self.xi8])
         xsv = self.ctx.ConstStruct([xav])
-        xsv_dump = '{ [2 x i64] } { [ %s, %s ] }' % (self.xi1_dump, self.xi8_dump)
+        #xsv_dump = '{ [2 x i64] } { [ %s, %s ] }' % (self.xi1_dump, self.xi8_dump)
         cnv = sv.ConstExtractValue([0, 1])
         assert cnv is self.int2
         cne = xsv.ConstExtractValue([0, 1])
@@ -4768,15 +4762,13 @@ class TestConstant(DumpTestCase):
         assert cne is self.xi8
 
     def test_ConstInsertValue(self):
-        a = llpy.core.ArrayType(self.i64, 2)
-        s = llpy.core.StructType(self.ctx, [a], None)
         av = self.i64.ConstArray([self.int1, self.int2])
         sv = self.ctx.ConstStruct([av])
         xav = self.i64.ConstArray([self.xi1, self.xi8])
         xsv = self.ctx.ConstStruct([xav])
-        xsv_dump = '{ [2 x i64] } { [ %s, %s ] }' % (self.xi1_dump, self.xi8_dump)
+        #xsv_dump = '{ [2 x i64] } { [ %s, %s ] }' % (self.xi1_dump, self.xi8_dump)
         value = self.int2
-        value_dump = 'i64 2'
+        #value_dump = 'i64 2'
         cnv = sv.ConstInsertValue(self.i64.ConstInt(3), [0, 1])
         assert cnv is self.ctx.ConstStruct([self.i64.ConstArray([self.int1, self.i64.ConstInt(3)])])
         cne = xsv.ConstInsertValue(value, [0, 1])
@@ -5679,24 +5671,6 @@ define i32 @func(i32 %arg, i32 %brg) {
 
 ''')
 
-    def GetNextUse(self):
-        ''' Obtain the next use of a value.
-
-            This effectively advances the iterator. It returns NULL if
-            you are on the final use and no more are available.
-        '''
-        return Use(_core.GetNextUse(self._raw))
-
-    def GetUser(self):
-        ''' Obtain the user value for a user.
-        '''
-        return Value(_core.GetUser(self._raw), self._context)
-
-    def GetUsedValue(self):
-        ''' Obtain the value this use corresponds to.
-        '''
-        return Value(_core.GetUsedValue(self._raw), self._context)
-
 
 @unittest.skip('NYI')
 class TestIRBuilder(unittest.TestCase):
@@ -5736,7 +5710,7 @@ class TestPassManager(unittest.TestCase):
 class TestFunctionPassManager(unittest.TestCase):
 
     def setUp(self):
-        self.fpm = (mod)
+        self.fpm = llpy.core.FunctionPassManager(mod)
 
     def test_initialize(self):
         changed = self.fpm.initialize()

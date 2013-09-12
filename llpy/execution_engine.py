@@ -23,12 +23,16 @@ import ctypes
 from llpy.utils import u2b, untested
 from llpy.c import (
         _c,
+        core as _core,
         execution_engine as _engine,
+        target as _target,
 )
 from llpy.core import (
         _message_to_string,
         _version,
+        Value,
 )
+from llpy.target import TargetData
 
 
 if (3, 3) <= _version:
@@ -36,9 +40,9 @@ if (3, 3) <= _version:
 
 
 from llpy.c.execution_engine import (
-    LinkInJIT,
-    LinkInMCJIT,
-    LinkInInterpreter,
+        LinkInJIT,
+        LinkInMCJIT,
+        LinkInInterpreter,
 )
 
 class GenericValue:
@@ -72,7 +76,8 @@ class GenericValue:
     if 0:
         @untested
         def ToPointer(self):
-            _engine.GenericValueToPointer = _library.function(ctypes.c_void_p, 'LLVMGenericValueToPointer', [GenericValue])
+            rv = _engine.GenericValueToPointer(self._raw)
+            return rv
 
     @untested
     def ToFloat(self, ty):
@@ -169,13 +174,11 @@ class ExecutionEngine:
 
     @untested
     def FreeMachineCodeForFunction(self, func):
-        _engine.FreeMachineCodeForFunction
-        _library.function(None, 'LLVMFreeMachineCodeForFunction', [ExecutionEngine, Value])
+        _engine.FreeMachineCodeForFunction(self._raw, func._raw)
 
     @untested
     def AddModule(self, mod):
-        _engine.AddModule
-        _library.function(None, 'LLVMAddModule', [ExecutionEngine, Module])
+        _engine.AddModule(self._raw, mod._raw)
 
     @untested
     def RemoveModule(self, mod):

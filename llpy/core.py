@@ -21,7 +21,6 @@
 '''
 
 import ctypes # some wrappers need to know
-import sys
 import weakref
 
 from llpy.utils import u2b, b2u, deprecated, untested, dangerous
@@ -2568,7 +2567,7 @@ class MemoryBuffer:
     __slots__ = ('_raw',)
 
     def __init__(self, filename):
-        self._raw = raw = _core.MemoryBuffer()
+        self._raw = _core.MemoryBuffer()
         error = _c.string_buffer()
 
         if filename is not None:

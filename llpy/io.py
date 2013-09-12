@@ -20,7 +20,7 @@
 
 import ctypes
 
-from llpy.utils import u2b, untested
+from llpy.utils import u2b
 from llpy.c import (
         _c,
         core as _core,
@@ -28,7 +28,6 @@ from llpy.c import (
         bit_writer as _bit_writer,
 )
 from llpy.core import (
-        Context,
         Module,
         _message_to_string
 )

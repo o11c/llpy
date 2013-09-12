@@ -22,7 +22,7 @@ import ctypes
 
 from . import _c
 
-from .core import _library, _version
+from .core import _library
 from .core import Bool
 from .core import Module
 from .core import Value

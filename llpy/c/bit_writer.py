@@ -20,7 +20,7 @@
 
 import ctypes
 
-from .core import _library, _version
+from .core import _library
 from .core import Module
 
 
