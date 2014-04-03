@@ -7,6 +7,10 @@ import unittest
 import llpy.core
 import llpy.io
 
+def slurp(filename):
+    with open(filename, 'rb') as f:
+        return f.read()
+
 class TestIO(unittest.TestCase):
 
     def test_bc(self):
@@ -22,7 +26,7 @@ class TestIO(unittest.TestCase):
             path_fd = os.path.join(tdn, 'fd')
             llpy.io.WriteBitcodeToFile(mod, path_file)
             llpy.io.WriteBitcodeToFD(mod, os.open(path_fd, os.O_WRONLY | os.O_CREAT | os.O_EXCL), True)
-            assert open(path_file, 'rb').read() == open(path_fd, 'rb').read()
+            assert slurp(path_file) == slurp(path_fd)
 
             mb = llpy.core.MemoryBuffer(path_file)
             mod2 = llpy.io.ParseBitcode(ctx, mb)

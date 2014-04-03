@@ -281,6 +281,7 @@ call_convs = dict(
     X86Fastcall = 65,
 )
 CallConv = _c.enum('CallConv', **call_convs)
+del call_convs
 
 int_predicates = [
     'EQ',

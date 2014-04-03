@@ -1070,16 +1070,22 @@ false:                                            ; preds = %entry
         if _version <= (3, 1):
             assert instr.GetOperand(2) is i1.ConstNull()
         if (3, 2) <= _version:
-            v = llpy.core.ConstVector([i1.ConstNull(), i1.ConstNull()])
-            arrv = v.TypeOf().ConstArray([v])
-            assert instr.GetOperand(2) is arrv
+            if _version <= (3, 3):
+                v = llpy.core.ConstVector([i1.ConstNull(), i1.ConstNull()])
+                arrv = v.TypeOf().ConstArray([v])
+                assert instr.GetOperand(2) is arrv
+            if (3, 4) <= _version:
+                assert instr.GetOperand(2) is i1.ConstNull()
         assert instr.GetOperand(3) is bb_false
         if _version <= (3, 1):
             assert instr.GetOperand(4) is i1.ConstAllOnes()
         if (3, 2) <= _version:
-            v = llpy.core.ConstVector([i1.ConstAllOnes(), i1.ConstAllOnes()])
-            arrv = v.TypeOf().ConstArray([v])
-            assert instr.GetOperand(4) is arrv
+            if _version <= (3, 3):
+                v = llpy.core.ConstVector([i1.ConstAllOnes(), i1.ConstAllOnes()])
+                arrv = v.TypeOf().ConstArray([v])
+                assert instr.GetOperand(4) is arrv
+            if (3, 4) <= _version:
+                assert instr.GetOperand(4) is i1.ConstAllOnes()
         assert instr.GetOperand(5) is bb_true
 
         self.assertDump(func,
@@ -5134,8 +5140,10 @@ declare i32 @func_decl() %s
                 ir = 'nonlazybind address_safety'
             if (3, 2) <= _version <= (3, 2):
                 ir = 'nonlazybind address_safety minsize'
-            if (3, 3) <= _version:
+            if (3, 3) <= _version <= (3, 3):
                 ir = 'minsize nobuiltin noduplicate nonlazybind returned sspstrong sanitize_address sanitize_thread sanitize_memory'
+            if (3, 4) <= _version:
+                ir = 'builtin cold minsize nobuiltin noduplicate nonlazybind optnone returned sspstrong sanitize_address sanitize_thread sanitize_memory'
             at = Attribute.NonLazyBind_buggy
             f = self.func_decl
             assert f.GetAttr() == Attribute()
@@ -5168,10 +5176,14 @@ declare i32 @func_decl() #0
             irs += ' address_safety'
         if (3, 2) <= _version:
             irs += ' minsize'
+        if (3, 4) <= _version:
+            irs += ' builtin cold optnone'
         if (3, 3) <= _version:
             irs += ' nobuiltin noduplicate returned sspstrong'
             irs = ' '.join(sorted(irs.split(' ')))
             irs = irs.replace('uwtable', 'sanitize_address sanitize_thread sanitize_memory uwtable')
+        if (3, 4) <= _version:
+            irs = irs.replace('optnone optsize', 'optsize optnone')
         attrs |= Attribute.StackAlignment
         irs += ' alignstack(64)'
         f = self.func_decl
