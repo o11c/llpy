@@ -23,6 +23,7 @@ import ctypes
 from . import _c
 
 from .core import _library, _version
+from .core import Context
 from .core import Type
 from .core import Value
 from .core import PassManager
@@ -38,7 +39,8 @@ del byte_orderings
 TargetData = _c.opaque('TargetData')
 if (3, 0) <= _version:
     TargetLibraryInfo = _c.opaque('TargetLibraryInfoData')
-StructLayout = _c.opaque('StructLayout')
+if _version <= (3, 3):
+    StructLayout = _c.opaque('StructLayout')
 
 
 # later filled in with successful add_target
@@ -159,12 +161,31 @@ if (3, 1) <= _version:
             globals()['Initialize%sDisassembler' % target]()
 
 
+# TODO in 3.4 you can maybe use GetDefaultTargetTriple ???
 def InitializeNativeTarget_nyi():
     if False: # have native target
         'init native target info'
         'init native target'
         if (3, 0) <= _version:
             'init native mc'
+        return 0
+    return 1
+
+def InitializeNativeAsmParser_nyi():
+    if False: # have native target
+        'init native asm parser'
+        return 0
+    return 1
+
+def InitializeNativeAsmPrinter_nyi():
+    if False: # have native target
+        'init native asm printer'
+        return 0
+    return 1
+
+def InitializeNativeDisassembler_nyi():
+    if False: # have native target
+        'init native disassembler'
         return 0
     return 1
 
@@ -181,6 +202,9 @@ if (3, 2) <= _version:
 IntPtrType = _library.function(Type, 'LLVMIntPtrType', [TargetData])
 if (3, 2) <= _version:
     IntPtrTypeForAS = _library.function(Type, 'LLVMIntPtrTypeForAS', [TargetData, ctypes.c_uint])
+if (3, 4) <= _version:
+    IntPtrTypeInContext = _library.function(Type, 'LLVMIntPtrTypeInContext', [Context, TargetData])
+    IntPtrTypeForASInContext = _library.function(Type, 'LLVMIntPtrTypeForASInContext', [Context, TargetData, ctypes.c_uint])
 SizeOfTypeInBits = _library.function(ctypes.c_ulonglong, 'LLVMSizeOfTypeInBits', [TargetData, Type])
 StoreSizeOfType = _library.function(ctypes.c_ulonglong, 'LLVMStoreSizeOfType', [TargetData, Type])
 ABISizeOfType = _library.function(ctypes.c_ulonglong, 'LLVMABISizeOfType', [TargetData, Type])

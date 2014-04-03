@@ -74,7 +74,11 @@ if (3, 1) <= _version:
 
     GetFirstTarget = _library.function(Target, 'LLVMGetFirstTarget', [])
     GetNextTarget = _library.function(Target, 'LLVMGetNextTarget', [Target])
+if (3, 4) <= _version:
+    GetTargetFromName = _library.function(Target, 'LLVMGetTargetFromName', [ctypes.c_char_p])
+    GetTargetFromTriple = _library.function(Bool, 'LLVMGetTargetFromTriple', [ctypes.c_char_p, ctypes.POINTER(Target), ctypes.POINTER(_c.string_buffer)])
 
+if (3, 1) <= _version:
     GetTargetName = _library.function(ctypes.c_char_p, 'LLVMGetTargetName', [Target])
     GetTargetDescription = _library.function(ctypes.c_char_p, 'LLVMGetTargetDescription', [Target])
     TargetHasJIT = _library.function(Bool, 'LLVMTargetHasJIT', [Target])
@@ -88,6 +92,11 @@ if (3, 1) <= _version:
     GetTargetMachineCPU = _library.function(_c.string_buffer, 'LLVMGetTargetMachineCPU', [TargetMachine])
     GetTargetMachineFeatureString = _library.function(_c.string_buffer, 'LLVMGetTargetMachineFeatureString', [TargetMachine])
     GetTargetMachineData = _library.function(TargetData, 'LLVMGetTargetMachineData', [TargetMachine])
+if (3, 4) <= _version:
+    SetTargetMachineAsmVerbosity = _library.function(None, 'LLVMSetTargetMachineAsmVerbosity', [TargetMachine, Bool])
+if (3, 1) <= _version:
     TargetMachineEmitToFile = _library.function(Bool, 'LLVMTargetMachineEmitToFile', [TargetMachine, Module, ctypes.c_char_p, CodeGenFileType, ctypes.POINTER(_c.string_buffer)])
 if (3, 3) <= _version:
     TargetMachineEmitToMemoryBuffer = _library.function(Bool, 'LLVMTargetMachineEmitToMemoryBuffer', [TargetMachine, Module, CodeGenFileType, ctypes.POINTER(_c.string_buffer), ctypes.POINTER(MemoryBuffer)])
+if (3, 4) <= _version:
+    GetDefaultTargetTriple = _library.function(_c.string_buffer, 'LLVMGetDefaultTargetTriple', [])

@@ -50,6 +50,7 @@ __TESTED_LLVM_VERSIONS = [
         # (3, 5),
 ]
 
+# Note: if adding windows support, also need to fix TODO in llpy/c/lto.py
 platforms = {
     'linux': 'libLLVM-%d.%d.so.1',
 }

@@ -28,7 +28,15 @@ from . import _c
 _library = _c.Library('libLTO.so')
 
 
-LTO_API_VERSION = 4
+if _version <= (3, 3):
+    bool = ctypes.c_bool
+    LTO_API_VERSION = 4
+if (3, 4) <= _version:
+    if False: # TODO check for MSVC ABI (not just windows!)
+        bool = ctypes.c_uchar
+    else:
+        bool = ctypes.c_bool
+    LTO_API_VERSION = 5
 
 
 lto_symbol_attributes = _c.enum('lto_symbol_attributes',
@@ -95,3 +103,6 @@ lto_codegen_add_must_preserve_symbol = _library.function(None, 'lto_codegen_add_
 lto_codegen_write_merged_modules = _library.function(ctypes.c_bool, 'lto_codegen_write_merged_modules', [lto_code_gen, ctypes.c_char_p])
 lto_codegen_compile = _library.function(_c.string_buffer, 'lto_codegen_compile', [lto_code_gen, ctypes.POINTER(ctypes.c_size_t)])
 lto_codegen_debug_options = _library.function(None, 'lto_codegen_debug_options', [lto_code_gen, ctypes.c_char_p])
+
+if (3, 3) <= _version:
+    lto_initialize_disassembler = _library.function(None, 'lto_initialize_disassembler', [])

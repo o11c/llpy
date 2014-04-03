@@ -36,6 +36,7 @@ if (3, 3) <= _version:
 
 GenericValue = _c.opaque('GenericValue')
 ExecutionEngine = _c.opaque('ExecutionEngine')
+MCJITMemoryManager = _c.opaque('MCJITMemoryManager')
 if (3, 3) <= _version:
     class MCJITCompilerOptions(ctypes.Structure):
         _fields_ = [
@@ -44,6 +45,10 @@ if (3, 3) <= _version:
             ('NoFramePointerElim', Bool),
             ('EnableFastISel', Bool),
         ]
+        if (3, 4) <= _version:
+            _fields_ += [
+                ('MCJMM', MCJITMemoryManager)
+            ]
 
         # Normally I have a rule not to have any calls in llpy.c.* modules,
         # But this is important and doesn't belong elsewhere.
@@ -51,8 +56,15 @@ if (3, 3) <= _version:
             InitializeMCJITCompilerOptions(ctypes.byref(self), ctypes.sizeof(self))
             ctypes.Structure.__init__(self, *args, **kwargs)
 
+if (3, 4) <= _version:
+    MemoryManagerAllocateCodeSectionCallback = ctypes.CFUNCTYPE(ctypes.POINTER(uint8_t), *[ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint, ctypes.c_char_p]);
+    MemoryManagerAllocateDataSectionCallback = ctypes.CFUNCTYPE(ctypes.POINTER(uint8_t), *[ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint, ctypes.c_char_p, Bool])
+    MemoryManagerFinalizeMemoryCallback = ctypes.CFUNCTYPE(Bool, *[ctypes.c_void_p, ctypes.POINTER(_c.string_buffer)])
+    MemoryManagerDestroyCallback = ctypes.CFUNCTYPE(None, *[ctypes.c_void_p])
+
 
 LinkInJIT = _library.function(None, 'LLVMLinkInJIT', [])
+# not in the header until 3.3, but in the library in 3.0
 LinkInMCJIT = _library.function(None, 'LLVMLinkInMCJIT', [])
 LinkInInterpreter = _library.function(None, 'LLVMLinkInInterpreter', [])
 
@@ -92,3 +104,7 @@ RecompileAndRelinkFunction = _library.function(ctypes.c_void_p, 'LLVMRecompileAn
 GetExecutionEngineTargetData = _library.function(TargetData, 'LLVMGetExecutionEngineTargetData', [ExecutionEngine])
 AddGlobalMapping = _library.function(None, 'LLVMAddGlobalMapping', [ExecutionEngine, Value, ctypes.c_void_p])
 GetPointerToGlobal = _library.function(ctypes.c_void_p, 'LLVMGetPointerToGlobal', [ExecutionEngine, Value])
+
+if (3, 4) <= _version:
+    CreateSimpleMCJITMemoryManager = _library.function(MCJITMemoryManager, 'LLVMCreateSimpleMCJITMemoryManager', [c_void_p, LLVMMemoryManagerAllocateCodeSectionCallback, LLVMMemoryManagerAllocateDataSectionCallback, LLVMMemoryManagerFinalizeMemoryCallback, LLVMMemoryManagerDestroyCallback])
+    DisposeMCJITMemoryManager = _library.function(None, 'LLVMDisposeMCJITMemoryManager', [LLVMMCJITMemoryManagerRef])

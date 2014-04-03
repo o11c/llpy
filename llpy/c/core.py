@@ -103,6 +103,11 @@ if (3, 3) <= _version:
     attributes.update(
         #StackProtectStrong  = 1 << 33,  # function
     )
+if (3, 4) <= _version:
+    attributes.update(
+        #Cold  = 1 << 34,           # function
+        #OptimizeNone  = 1 << 34,   # function
+    )
 Attribute = _c.bit_enum('Attribute', **attributes)
 del attributes
 Attribute.__doc__ = '''Attributes are used in at least 3 places:
@@ -165,6 +170,7 @@ opcodes.update(
     PtrToInt        = 39,
     IntToPtr        = 40,
     BitCast         = 41,
+    #AddrSpaceCast below
 
     ICmp            = 42,
     FCmp            = 43,
@@ -198,6 +204,10 @@ if (3, 0) <= _version:
 if (3, 0) <= _version <= (3, 0):
     opcodes.update(
         Unwind = 60,
+    )
+if (3, 4) <= _version:
+    opcodes.update(
+        AddrSpaceCast = 60,
     )
 Opcode = _c.enum('Opcode', **opcodes)
 del opcodes
@@ -242,7 +252,7 @@ linkages = [
 ]
 if (3, 2) <= _version:
     linkages += [
-        'LinkOnceODRAutoHide',
+        'LinkOnceODRAutoHide',  # Obsolete in 3.4
     ]
 linkages += [
     'WeakAny',
@@ -277,6 +287,13 @@ call_convs = dict(
     C           = 0,
     Fast        = 8,
     Cold        = 9,
+)
+if (3, 4) <= _version:
+    call_convs.update(
+        WebKitJS= 12,
+        AnyReg  = 13,
+    )
+call_convs.update(
     X86Stdcall  = 64,
     X86Fastcall = 65,
 )
@@ -366,13 +383,24 @@ if (3, 3) <= _version:
     AtomicRMWBinOp = _c.enum('AtomicRMWBinOp', **{v: k for k, v in enumerate(atomic_rmw_binops)})
     del atomic_rmw_binops
 
+if (3, 4) <= _version:
+    FatalErrorHandler = ctypes.CFUNCTYPE(None, *[ctypes.c_char_p])
 
 
 if (3, 0) <= _version:
     InitializeCore = _library.function(None, 'LLVMInitializeCore', [PassRegistry])
 if (3, 3) <= _version:
     Shutdown = _library.function(None, 'LLVMShutdown', [])
+
+if (3, 4) <= _version:
+    CreateMessage = _library.function(_c.string_buffer, 'LLVMCreateMessage', [ctypes.c_char_p])
 DisposeMessage = _library.function(None, 'LLVMDisposeMessage', [_c.string_buffer])
+if (3, 4) <= _version:
+    InstallFatalErrorHandler = _library.function(None, 'LLVMInstallFatalErrorHandler', [FatalErrorHandler])
+    ResetFatalErrorHandler = _library.function(None, 'LLVMResetFatalErrorHandler', [])
+    EnablePrettyStackTrace = _library.function(None, 'LLVMEnablePrettyStackTrace', [])
+
+
 
 ContextCreate = _library.function(Context, 'LLVMContextCreate', [])
 GetGlobalContext = _library.function(Context, 'LLVMGetGlobalContext', [])
@@ -396,6 +424,8 @@ if _version <= (2, 9):
 DumpModule = _library.function(None, 'LLVMDumpModule', [Module])
 if (3, 2) <= _version:
     PrintModuleToFile = _library.function(Bool, 'LLVMPrintModuleToFile', [Module, ctypes.c_char_p, ctypes.POINTER(_c.string_buffer)])
+if (3, 4) <= _version:
+    PrintModuleToString = _library.function(_c.string_buffer, 'LLVMPrintModuleToString', [Module])
 SetModuleInlineAsm = _library.function(None, 'LLVMSetModuleInlineAsm', [Module, ctypes.c_char_p])
 GetModuleContext = _library.function(Context, 'LLVMGetModuleContext', [Module])
 GetTypeByName = _library.function(Type, 'LLVMGetTypeByName', [Module, ctypes.c_char_p])
@@ -419,6 +449,9 @@ GetTypeKind = _library.function(TypeKind, 'LLVMGetTypeKind', [Type])
 if (3, 0) <= _version:
     TypeIsSized = _library.function(Bool, 'LLVMTypeIsSized', [Type])
 GetTypeContext = _library.function(Context, 'LLVMGetTypeContext', [Type])
+if (3, 4) <= _version:
+    DumpType = _library.function(None, 'LLVMDumpType', [Type])
+    PrintTypeToString = _library.function(_c.string_buffer, 'LLVMPrintTypeToString', [Type])
 
 Int1TypeInContext = _library.function(Type, 'LLVMInt1TypeInContext', [Context])
 Int8TypeInContext = _library.function(Type, 'LLVMInt8TypeInContext', [Context])
@@ -507,6 +540,8 @@ TypeOf = _library.function(Type, 'LLVMTypeOf', [Value])
 GetValueName = _library.function(ctypes.c_char_p, 'LLVMGetValueName', [Value])
 SetValueName = _library.function(None, 'LLVMSetValueName', [Value, ctypes.c_char_p])
 DumpValue = _library.function(None, 'LLVMDumpValue', [Value])
+if (3, 4) <= _version:
+    PrintValueToString = _library.function(None, 'LLVMPrintValueToString', [Value])
 ReplaceAllUsesWith = _library.function(None, 'LLVMReplaceAllUsesWith', [Value, Value])
 IsConstant = _library.function(Bool, 'LLVMIsConstant', [Value])
 IsUndef = _library.function(Bool, 'LLVMIsUndef', [Value])
@@ -524,6 +559,10 @@ if (3, 0) <= _version:
     IsABlockAddress = _library.function(Value, 'LLVMIsABlockAddress', [Value])
 IsAConstantAggregateZero = _library.function(Value, 'LLVMIsAConstantAggregateZero', [Value])
 IsAConstantArray = _library.function(Value, 'LLVMIsAConstantArray', [Value])
+if (3, 4) <= _version:
+    IsAConstantDataSequential = _library.function(Value, 'LLVMIsAConstantDataSequential', [Value])
+    IsAConstantDataArray = _library.function(Value, 'LLVMIsAConstantDataArray', [Value])
+    IsAConstantDataVector = _library.function(Value, 'LLVMIsAConstantDataVector', [Value])
 IsAConstantExpr = _library.function(Value, 'LLVMIsAConstantExpr', [Value])
 IsAConstantFP = _library.function(Value, 'LLVMIsAConstantFP', [Value])
 IsAConstantInt = _library.function(Value, 'LLVMIsAConstantInt', [Value])
@@ -578,6 +617,8 @@ if _version <= (2, 9):
 IsAUnaryInstruction = _library.function(Value, 'LLVMIsAUnaryInstruction', [Value])
 IsAAllocaInst = _library.function(Value, 'LLVMIsAAllocaInst', [Value])
 IsACastInst = _library.function(Value, 'LLVMIsACastInst', [Value])
+if (3, 4) <= _version:
+    IsAAddrSpaceCastInst = _library.function(Value, 'LLVMIsAAddrSpaceCastInst', [Value])
 IsABitCastInst = _library.function(Value, 'LLVMIsABitCastInst', [Value])
 IsAFPExtInst = _library.function(Value, 'LLVMIsAFPExtInst', [Value])
 IsAFPToSIInst = _library.function(Value, 'LLVMIsAFPToSIInst', [Value])
@@ -680,6 +721,8 @@ ConstFPToSI = _library.function(Value, 'LLVMConstFPToSI', [Value, Type])
 ConstPtrToInt = _library.function(Value, 'LLVMConstPtrToInt', [Value, Type])
 ConstIntToPtr = _library.function(Value, 'LLVMConstIntToPtr', [Value, Type])
 ConstBitCast = _library.function(Value, 'LLVMConstBitCast', [Value, Type])
+if (3, 4) <= _version:
+    ConstAddrSpaceCast = _library.function(Value, 'LLVMConstAddrSpaceCast', [Value, Type])
 ConstZExtOrBitCast = _library.function(Value, 'LLVMConstZExtOrBitCast', [Value, Type])
 ConstSExtOrBitCast = _library.function(Value, 'LLVMConstSExtOrBitCast', [Value, Type])
 ConstTruncOrBitCast = _library.function(Value, 'LLVMConstTruncOrBitCast', [Value, Type])
@@ -918,6 +961,8 @@ BuildFPExt = _library.function(Value, 'LLVMBuildFPExt', [Builder, Value, Type, c
 BuildPtrToInt = _library.function(Value, 'LLVMBuildPtrToInt', [Builder, Value, Type, ctypes.c_char_p])
 BuildIntToPtr = _library.function(Value, 'LLVMBuildIntToPtr', [Builder, Value, Type, ctypes.c_char_p])
 BuildBitCast = _library.function(Value, 'LLVMBuildBitCast', [Builder, Value, Type, ctypes.c_char_p])
+if (3, 4) <= _version:
+    BuildAddrSpaceCast = _library.function(Value, 'LLVMBuildAddrSpaceCast', [Builder, Value, Type, ctypes.c_char_p])
 BuildZExtOrBitCast = _library.function(Value, 'LLVMBuildZExtOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
 BuildSExtOrBitCast = _library.function(Value, 'LLVMBuildSExtOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
 BuildTruncOrBitCast = _library.function(Value, 'LLVMBuildTruncOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
