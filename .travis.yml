@@ -10,7 +10,7 @@ install:
   - sudo apt-get update -qq
   - sudo apt-get install libllvm$LLPY_LLVM_VERSION
 script:
-  - ./runtests.py
+  - python ./runtests.py
 env:
   - LLPY_LLVM_VERSION=3.0
   - LLPY_LLVM_VERSION=3.1
