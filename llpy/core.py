@@ -1,3 +1,4 @@
+#   -*- encoding: utf-8 -*-
 #   Copyright © 2013 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
@@ -49,7 +50,7 @@ from llpy.c.analysis import (
 )
 from llpy import __unknown_values as unknown_values
 
-class Context:
+class Context(object):
     ''' Contexts are execution states for the core LLVM IR system.
 
         Most types are tied to a context instance. Multiple contexts can
@@ -99,7 +100,7 @@ class Context:
         raw_values = (_core.Value * n)(*[i._raw for i in values])
         return Value(_core.MDNodeInContext(self._raw, raw_values, n), self)
 
-class Module:
+class Module(object):
     ''' Modules represent the top-level structure in a LLVM program. An LLVM
         module is effectively a translation unit or a collection of
         translation units merged together.
@@ -235,7 +236,7 @@ class Module:
 
 
 
-class Type:
+class Type(object):
     ''' Types represent the type of a value.
 
         Types are associated with a context instance. The context
@@ -285,6 +286,10 @@ class Type:
         self._raw = raw
         self._context = context
         return self
+
+    def __init__(self, *args, **kwargs):
+        # python2 compatibility
+        pass
 
     def IsSized(self):
         ''' Whether the type has a known size.
@@ -802,7 +807,7 @@ class MetadataType(Type):
 Type._kind_type_map[TypeKind.Metadata] = MetadataType
 
 
-class Value:
+class Value(object):
     __slots__ = ('_raw', '_context', '__weakref__')
 
     def __new__(cls, raw, context):
@@ -2141,7 +2146,7 @@ class    VAArgInst(UnaryInstruction):
 
 
 
-class Use:
+class Use(object):
     ''' Is it even worth exposing this in the public API?
         A mere iterable-of-values might suffice ...
     '''
@@ -2186,7 +2191,7 @@ def ConstVector(values):
     raw_values = (_core.Value * n)(*[i._raw for i in values])
     return Value(_core.ConstVector(raw_values, n), values[0]._context)
 
-class IRBuilder:
+class IRBuilder(object):
     __slots__ = ('_raw', '_context')
 
     def __init__(self, context):
@@ -2537,7 +2542,7 @@ class IRBuilder:
     def BuildPtrDiff(self, lhs, rhs, name=''):
         return Value(_core.BuildPtrDiff(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
-class ModuleProvider:
+class ModuleProvider(object):
     __slots__ = ('_raw', '_mod')
 
     @untested
@@ -2563,7 +2568,7 @@ def _message_to_string(message):
     _core.DisposeMessage(message)
     return b2u(s)
 
-class MemoryBuffer:
+class MemoryBuffer(object):
     __slots__ = ('_raw',)
 
     def __init__(self, filename):
@@ -2582,7 +2587,7 @@ class MemoryBuffer:
     def __del__(self):
         _core.DisposeMemoryBuffer(self._raw)
 
-class PassRegistry:
+class PassRegistry(object):
     __slots__ = ('_raw',)
 
     @untested
@@ -2650,7 +2655,7 @@ class PassRegistry:
         _initialization.InitializeTarget(self._raw)
 
 
-class PassManagerBase:
+class PassManagerBase(object):
     __slots__ = ('_raw',)
 
     @untested

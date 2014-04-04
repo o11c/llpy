@@ -7,6 +7,8 @@ import unittest
 import llpy.core
 import llpy.io
 
+from llpy.compat import TemporaryDirectory
+
 def slurp(filename):
     with open(filename, 'rb') as f:
         return f.read()
@@ -21,7 +23,7 @@ class TestIO(unittest.TestCase):
         st.StructSetBody([stp])
         glo = mod.AddGlobal(st, 'goo')
         glo.SetInitializer(st.ConstNamedStruct([glo]))
-        with tempfile.TemporaryDirectory() as tdn:
+        with TemporaryDirectory() as tdn:
             path_file = os.path.join(tdn, 'file')
             path_fd = os.path.join(tdn, 'fd')
             llpy.io.WriteBitcodeToFile(mod, path_file)

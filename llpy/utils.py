@@ -1,3 +1,4 @@
+#   -*- encoding: utf-8 -*-
 #   Copyright © 2013 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
@@ -27,13 +28,13 @@ def u2b(u):
     ''' Convert a unicode string to bytes, without exception.
     '''
     assert isinstance(u, str)
-    return bytes(u, 'utf-8', 'surrogateescape')
+    return u.encode('utf-8', 'surrogateescape')
 
 def b2u(b):
     ''' Convert a byte string to unicode, without exception.
     '''
     assert isinstance(b, bytes)
-    return str(b, 'utf-8', 'surrogateescape')
+    return b.decode('utf-8', 'surrogateescape')
 
 # These things are ugly as decorators,
 # and also they don't interoperate well with the unit tests,

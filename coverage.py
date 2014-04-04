@@ -4,8 +4,8 @@ import trace
 
 # for some reason unittest.main(module=None) kills the process
 def inner_main():
-    import test_everything
-    test_everything.main()
+    import runtests
+    runtests.main()
 
 def main():
     ignored = [

@@ -7,8 +7,9 @@ import unittest
 
 import llpy.core
 from llpy.c.core import _version
+from llpy.compat import long
 
-class ReplaceOutFD:
+class ReplaceOutFD(object):
     ''' Capture output send to stderr via C functions
     '''
 
@@ -49,8 +50,8 @@ class TestContext(DumpTestCase):
     def test_md_kind_id(self):
         foo = self.ctx.GetMDKindID('foo')
         bar = self.ctx.GetMDKindID('bar')
-        assert isinstance(foo, int)
-        assert isinstance(bar, int)
+        assert isinstance(foo, (int, long))
+        assert isinstance(bar, (int, long))
         assert foo != bar
 
     def test_const_string(self):

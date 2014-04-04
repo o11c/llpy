@@ -1,3 +1,4 @@
+#   -*- encoding: utf-8 -*-
 #   Copyright © 2013 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
@@ -20,7 +21,7 @@
 
 import ctypes
 
-class Library:
+class Library(object):
     __slots__ = ('_cdll',)
 
     def __init__(self, name):
@@ -61,6 +62,7 @@ def enum(name, **kwargs):
 
         def __bool__(self):
             return bool(self.value)
+        __nonzero__ = __bool__
 
         def __repr__(self):
             try:
@@ -98,6 +100,7 @@ def bit_enum(name, **kwargs):
 
         def __bool__(self):
             return bool(self.value)
+        __nonzero__ = __bool__
 
         def __or__(self, other):
             return Enum(self.value | other.value)

@@ -1,3 +1,4 @@
+#   -*- encoding: utf-8 -*-
 #   Copyright © 2013 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
@@ -36,7 +37,7 @@ from llpy.core import (
 from llpy.c.target import ByteOrdering
 
 
-class TargetData:
+class TargetData(object):
     __slots__ = ('_raw')
 
     def __init__(self, name):
@@ -195,7 +196,7 @@ if (3, 1) <= _version:
             CodeGenFileType,
     )
 
-    class Target:
+    class Target(object):
         __slots__ = ('_raw')
 
         @untested
@@ -238,7 +239,7 @@ if (3, 1) <= _version:
         def HasAsmBackend(self):
             return bool(_machine.TargetHasAsmBackend(self._raw))
 
-    class TargetMachine:
+    class TargetMachine(object):
 
         @untested
         def __init__(self, target, triple, cpu, features, opt, reloc, codemodel):

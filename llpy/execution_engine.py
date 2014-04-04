@@ -1,3 +1,4 @@
+#   -*- encoding: utf-8 -*-
 #   Copyright © 2013 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
@@ -45,7 +46,7 @@ from llpy.c.execution_engine import (
         LinkInInterpreter,
 )
 
-class GenericValue:
+class GenericValue(object):
     __slots__ = ('_raw')
 
     @untested
@@ -83,7 +84,7 @@ class GenericValue:
     def ToFloat(self, ty):
         return _engine.GenericValueToFloat(ty._raw, self._raw)
 
-class ExecutionEngine:
+class ExecutionEngine(object):
     __slots__ = ('_raw')
 
     @untested
