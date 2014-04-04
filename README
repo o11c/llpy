@@ -1,10 +1,11 @@
 Pure Python3 bindings for LLVM.
 
-These are a set of pure python bindings for LLVM. They will eventually be
-independent of the LLVM release.
+These are a set of pure python bindings for LLVM. You can use them with
+whatever version of LLVM is installed on the user's system, instead of
+having to build NxM python C extensions.
 
 Currently, only Linux is supported, though porting is probably as simple
-as changing the library filenames.
+as changing the library filenames. Debian and Ubuntu are the most tested.
 
 Python2 support is feasible, but would be complicated due to the int/long
 and str/unicode problems.

@@ -149,11 +149,10 @@ def initialize_target(target):
     assert target in _target.ALL_TARGETS
     getattr(_target, 'Initialize%sTarget' % target)()
 
-if (3, 0) <= _version:
-    @untested
-    def initialize_target_mc(target):
-        assert target in _target.ALL_TARGETS
-        getattr(_target, 'Initialize%sTargetMC' % target)()
+@untested
+def initialize_target_mc(target):
+    assert target in _target.ALL_TARGETS
+    getattr(_target, 'Initialize%sTargetMC' % target)()
 
 if (3, 1) <= _version:
     @untested

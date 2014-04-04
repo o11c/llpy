@@ -37,8 +37,7 @@ ByteOrdering = _c.enum('ByteOrdering', **{v: k for k, v in enumerate(byte_orderi
 del byte_orderings
 
 TargetData = _c.opaque('TargetData')
-if (3, 0) <= _version:
-    TargetLibraryInfo = _c.opaque('TargetLibraryInfoData')
+TargetLibraryInfo = _c.opaque('TargetLibraryInfoData')
 if _version <= (3, 3):
     StructLayout = _c.opaque('StructLayout')
 
@@ -59,9 +58,8 @@ def add_target(target):
         globals()[name] = _library.function(None, 'LLVM%s' % name, [])
         name = 'Initialize%sTarget' % target
         globals()[name] = _library.function(None, 'LLVM%s' % name, [])
-        if (3, 0) <= _version:
-            name = 'Initialize%sTargetMC' % target
-            globals()[name] = _library.function(None, 'LLVM%s' % name, [])
+        name = 'Initialize%sTargetMC' % target
+        globals()[name] = _library.function(None, 'LLVM%s' % name, [])
         ALL_TARGETS.add(target)
     except AttributeError:
         return
@@ -161,13 +159,12 @@ if (3, 1) <= _version:
             globals()['Initialize%sDisassembler' % target]()
 
 
-# TODO in 3.4 you can maybe use GetDefaultTargetTriple ???
+# TODO in 3.4 you can maybe use GetDefaultTargetTriple?
 def InitializeNativeTarget_nyi():
     if False: # have native target
         'init native target info'
         'init native target'
-        if (3, 0) <= _version:
-            'init native mc'
+        'init native mc'
         return 0
     return 1
 
@@ -192,8 +189,7 @@ def InitializeNativeDisassembler_nyi():
 
 CreateTargetData = _library.function(TargetData, 'LLVMCreateTargetData', [ctypes.c_char_p])
 AddTargetData = _library.function(None, 'LLVMAddTargetData', [TargetData, PassManager])
-if (3, 0) <= _version:
-    AddTargetLibraryInfo = _library.function(None, 'LLVMAddTargetLibraryInfo', [TargetLibraryInfo, PassManager])
+AddTargetLibraryInfo = _library.function(None, 'LLVMAddTargetLibraryInfo', [TargetLibraryInfo, PassManager])
 CopyStringRepOfTargetData = _library.function(_c.string_buffer, 'LLVMCopyStringRepOfTargetData', [TargetData])
 ByteOrder = _library.function(ByteOrdering, 'LLVMByteOrder', [TargetData])
 PointerSize = _library.function(ctypes.c_uint, 'LLVMPointerSize', [TargetData])
@@ -214,6 +210,4 @@ PreferredAlignmentOfType = _library.function(ctypes.c_uint, 'LLVMPreferredAlignm
 PreferredAlignmentOfGlobal = _library.function(ctypes.c_uint, 'LLVMPreferredAlignmentOfGlobal', [TargetData, Value])
 ElementAtOffset = _library.function(ctypes.c_uint, 'LLVMElementAtOffset', [TargetData, Type, ctypes.c_ulonglong])
 OffsetOfElement = _library.function(ctypes.c_ulonglong, 'LLVMOffsetOfElement', [TargetData, Type, ctypes.c_uint])
-if _version <= (2, 9):
-    InvalidateStructLayout = _library.function(None, 'LLVMInvalidateStructLayout', [TargetData, Type])
 DisposeTargetData = _library.function(None, 'LLVMDisposeTargetData', [TargetData])

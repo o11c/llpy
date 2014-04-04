@@ -57,8 +57,8 @@ if (3, 3) <= _version:
             ctypes.Structure.__init__(self, *args, **kwargs)
 
 if (3, 4) <= _version:
-    MemoryManagerAllocateCodeSectionCallback = ctypes.CFUNCTYPE(ctypes.POINTER(uint8_t), *[ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint, ctypes.c_char_p]);
-    MemoryManagerAllocateDataSectionCallback = ctypes.CFUNCTYPE(ctypes.POINTER(uint8_t), *[ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint, ctypes.c_char_p, Bool])
+    MemoryManagerAllocateCodeSectionCallback = ctypes.CFUNCTYPE(ctypes.POINTER(ctypes.c_uint8), *[ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint, ctypes.c_char_p]);
+    MemoryManagerAllocateDataSectionCallback = ctypes.CFUNCTYPE(ctypes.POINTER(ctypes.c_uint8), *[ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint, ctypes.c_uint, ctypes.c_char_p, Bool])
     MemoryManagerFinalizeMemoryCallback = ctypes.CFUNCTYPE(Bool, *[ctypes.c_void_p, ctypes.POINTER(_c.string_buffer)])
     MemoryManagerDestroyCallback = ctypes.CFUNCTYPE(None, *[ctypes.c_void_p])
 
@@ -106,5 +106,5 @@ AddGlobalMapping = _library.function(None, 'LLVMAddGlobalMapping', [ExecutionEng
 GetPointerToGlobal = _library.function(ctypes.c_void_p, 'LLVMGetPointerToGlobal', [ExecutionEngine, Value])
 
 if (3, 4) <= _version:
-    CreateSimpleMCJITMemoryManager = _library.function(MCJITMemoryManager, 'LLVMCreateSimpleMCJITMemoryManager', [c_void_p, LLVMMemoryManagerAllocateCodeSectionCallback, LLVMMemoryManagerAllocateDataSectionCallback, LLVMMemoryManagerFinalizeMemoryCallback, LLVMMemoryManagerDestroyCallback])
-    DisposeMCJITMemoryManager = _library.function(None, 'LLVMDisposeMCJITMemoryManager', [LLVMMCJITMemoryManagerRef])
+    CreateSimpleMCJITMemoryManager = _library.function(MCJITMemoryManager, 'LLVMCreateSimpleMCJITMemoryManager', [ctypes.c_void_p, MemoryManagerAllocateCodeSectionCallback, MemoryManagerAllocateDataSectionCallback, MemoryManagerFinalizeMemoryCallback, MemoryManagerDestroyCallback])
+    DisposeMCJITMemoryManager = _library.function(None, 'LLVMDisposeMCJITMemoryManager', [MCJITMemoryManager])

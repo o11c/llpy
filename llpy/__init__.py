@@ -55,6 +55,7 @@ platforms = {
     'linux': 'libLLVM-%d.%d.so.1',
 }
 platforms['linux2'] = platforms['linux'] # python 3.2 and earlier
+# TODO LTO: '/usr/lib/llvm-%d.%d/lib/libLTO.so'
 
 set_library_pattern(platforms[sys.platform])
 

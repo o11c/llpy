@@ -1,8 +1,13 @@
 language: python
 python:
+# LLPY doesn't support it yet
+# - "2.7"
   - "3.2"
   - "3.3"
+# Travis doesn't support it yet
+#  - "3.4"
 install:
+  - sudo add-apt-repository --yes ppa:h-rayflood/llvm
   - sudo apt-get update -qq
   - sudo apt-get install libllvm$LLPY_LLVM_VERSION
 script:
@@ -11,4 +16,5 @@ env:
   - LLPY_LLVM_VERSION=3.0
   - LLPY_LLVM_VERSION=3.1
   - LLPY_LLVM_VERSION=3.2
-#  - LLPY_LLVM_VERSION=3.3    Not available in precise
+  - LLPY_LLVM_VERSION=3.3
+  - LLPY_LLVM_VERSION=3.4

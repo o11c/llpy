@@ -23,10 +23,13 @@ import ctypes
 from . import _c
 from .core import _version
 
-if _version <= (3, 2):
-    # that's when the header disappeared, at least
-    # I can only find the library for 2.9
-    _library = _c.Library('libEnhancedDisassembly.so')
+# 2.9 ships a shared library
+# 3.0 only seems to ship a static library (unusable)
+# 3.1 and 3.2 ship the symbols as part of the main library
+# 3.3 no longer ships the header
+if (3, 1) <= _version <= (3, 2):
+    # _library = _c.Library('libEnhancedDisassembly.so')
+    from .core import _library
 
 
     ByteReaderCallback = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.POINTER(ctypes.c_uint8), ctypes.c_uint64, ctypes.c_void_p)

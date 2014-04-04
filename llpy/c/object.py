@@ -45,32 +45,32 @@ MoveToNextSection = _library.function(None, 'LLVMMoveToNextSection', [SectionIte
 if (3, 1) <= _version:
     MoveToContainingSection = _library.function(None, 'LLVMMoveToContainingSection', [SectionIterator, SymbolIterator])
 
-    GetSymbols = _library.function(SymbolIterator, 'LLVMGetSymbols', [ObjectFile]
-    DisposeSymbolIterator = _library.function(void, 'LLVMDisposeSymbolIterator', [SymbolIterator]
-    IsSymbolIteratorAtEnd = _library.function(LLVMBool, 'LLVMIsSymbolIteratorAtEnd', [ObjectFile, SymbolIterator]
-    MoveToNextSymbol = _library.function(void, 'LLVMMoveToNextSymbol', [SymbolIterator]
+    GetSymbols = _library.function(SymbolIterator, 'LLVMGetSymbols', [ObjectFile])
+    DisposeSymbolIterator = _library.function(None, 'LLVMDisposeSymbolIterator', [SymbolIterator])
+    IsSymbolIteratorAtEnd = _library.function(Bool, 'LLVMIsSymbolIteratorAtEnd', [ObjectFile, SymbolIterator])
+    MoveToNextSymbol = _library.function(None, 'LLVMMoveToNextSymbol', [SymbolIterator])
 
 GetSectionName = _library.function(ctypes.c_char_p, 'LLVMGetSectionName', [SectionIterator])
 GetSectionSize = _library.function(ctypes.c_uint64, 'LLVMGetSectionSize', [SectionIterator])
 GetSectionContents = _library.function(ctypes.c_char_p, 'LLVMGetSectionContents', [SectionIterator])
 
 if (3, 1) <= _version:
-    GetSectionAddress = _library.function(uint64_t, 'LLVMGetSectionAddress', [SectionIterator]
-    GetSectionContainsSymbol = _library.function(LLVMBool, 'LLVMGetSectionContainsSymbol', [SectionIterator, SymbolIterator]
+    GetSectionAddress = _library.function(ctypes.c_uint64, 'LLVMGetSectionAddress', [SectionIterator])
+    GetSectionContainsSymbol = _library.function(Bool, 'LLVMGetSectionContainsSymbol', [SectionIterator, SymbolIterator])
 
-    GetRelocations = _library.function(RelocationIterator, 'LLVMGetRelocations', [SectionIterator]
-    DisposeRelocationIterator = _library.function(void, 'LLVMDisposeRelocationIterator', [RelocationIterator]
-    IsRelocationIteratorAtEnd = _library.function(LLVMBool, 'LLVMIsRelocationIteratorAtEnd', [SectionIterator, RelocationIterator]
-    MoveToNextRelocation = _library.function(void, 'LLVMMoveToNextRelocation', [RelocationIterator]
+    GetRelocations = _library.function(RelocationIterator, 'LLVMGetRelocations', [SectionIterator])
+    DisposeRelocationIterator = _library.function(None, 'LLVMDisposeRelocationIterator', [RelocationIterator])
+    IsRelocationIteratorAtEnd = _library.function(Bool, 'LLVMIsRelocationIteratorAtEnd', [SectionIterator, RelocationIterator])
+    MoveToNextRelocation = _library.function(None, 'LLVMMoveToNextRelocation', [RelocationIterator])
 
-    GetSymbolName = _library.function(c_char_p, 'LLVMGetSymbolName', [SymbolIterator]
-    GetSymbolAddress = _library.function(uint64_t, 'LLVMGetSymbolAddress', [SymbolIterator]
-    GetSymbolFileOffset = _library.function(uint64_t, 'LLVMGetSymbolFileOffset', [SymbolIterator]
-    GetSymbolSize = _library.function(uint64_t, 'LLVMGetSymbolSize', [SymbolIterator]
+    GetSymbolName = _library.function(ctypes.c_char_p, 'LLVMGetSymbolName', [SymbolIterator])
+    GetSymbolAddress = _library.function(ctypes.c_uint64, 'LLVMGetSymbolAddress', [SymbolIterator])
+    GetSymbolFileOffset = _library.function(ctypes.c_uint64, 'LLVMGetSymbolFileOffset', [SymbolIterator])
+    GetSymbolSize = _library.function(ctypes.c_uint64, 'LLVMGetSymbolSize', [SymbolIterator])
 
-    GetRelocationAddress = _library.function(uint64_t, 'LLVMGetRelocationAddress', [RelocationIterator]
-    GetRelocationOffset = _library.function(uint64_t, 'LLVMGetRelocationOffset', [RelocationIterator]
-    GetRelocationSymbol = _library.function(SymbolIterator, 'LLVMGetRelocationSymbol', [RelocationIterator]
-    GetRelocationType = _library.function(uint64_t, 'LLVMGetRelocationType', [RelocationIterator]
-    GetRelocationTypeName = _library.function(c_char_p, 'LLVMGetRelocationTypeName', [RelocationIterator]
-    GetRelocationValueString = _library.function(c_char_p, 'LLVMGetRelocationValueString', [RelocationIterator]
+    GetRelocationAddress = _library.function(ctypes.c_uint64, 'LLVMGetRelocationAddress', [RelocationIterator])
+    GetRelocationOffset = _library.function(ctypes.c_uint64, 'LLVMGetRelocationOffset', [RelocationIterator])
+    GetRelocationSymbol = _library.function(SymbolIterator, 'LLVMGetRelocationSymbol', [RelocationIterator])
+    GetRelocationType = _library.function(ctypes.c_uint64, 'LLVMGetRelocationType', [RelocationIterator])
+    GetRelocationTypeName = _library.function(ctypes.c_char_p, 'LLVMGetRelocationTypeName', [RelocationIterator])
+    GetRelocationValueString = _library.function(ctypes.c_char_p, 'LLVMGetRelocationValueString', [RelocationIterator])
