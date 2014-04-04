@@ -9,3 +9,8 @@ as changing the library filenames. Debian and Ubuntu are the most tested.
 
 Python2 support is feasible, but would be complicated due to the int/long
 and str/unicode problems.
+
+Current status:
+  - Supports Python 3.2 or later
+  - Full safe wrappers for IR generation and writing.
+  - Raw bindings to all C APIs available
