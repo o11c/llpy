@@ -2397,24 +2397,24 @@ class IRBuilder(object):
     def BuildFree(self, ptr):
         return Value(_core.BuildFree(self._raw, ptr._raw), self._context)
 
-    def BuildLoad(self, ptr, name):
+    def BuildLoad(self, ptr, name=''):
         return Value(_core.BuildLoad(self._raw, ptr._raw, u2b(name)), self._context)
 
     def BuildStore(self, val, ptr):
         return Value(_core.BuildStore(self._raw, val._raw, ptr._raw), self._context)
 
-    def BuildGEP(self, ptr, indices, name):
+    def BuildGEP(self, ptr, indices, name=''):
         n = len(indices)
         raw_indices = (_core.Value * n)(*[i._raw for i in indices])
         return Value(_core.BuildGEP(self._raw, ptr._raw, raw_indices, n, u2b(name)), self._context)
 
-    def BuildInBoundsGEP(self, ptr, indices, name):
+    def BuildInBoundsGEP(self, ptr, indices, name=''):
         n = len(indices)
         raw_indices = (_core.Value * n)(*[i._raw for i in indices])
         return Value(_core.BuildInBoundsGEP(self._raw, ptr._raw, raw_indices, n, u2b(name)), self._context)
 
     @untested
-    def BuildStructGEP(self, ptr, index, name):
+    def BuildStructGEP(self, ptr, index, name=''):
         return Value(_core.BuildStructGEP(self._raw, ptr._raw, index, u2b(name)), self._context)
 
     def BuildGlobalString(self, s, name=''):

@@ -2453,7 +2453,7 @@ define void @func(i32 %arg) {
         builder.PositionBuilderAtEnd(bb)
         ptr = builder.BuildAlloca(i32, 'aa')
 
-        instr = builder.BuildLoad(ptr, 'load')
+        instr = builder.BuildLoad(ptr)
         assert isinstance(instr, llpy.core.LoadInst)
         assert instr.GetInstructionParent() is bb
         assert instr.GetInstructionOpcode() == llpy.core.Opcode.Load
@@ -2467,7 +2467,7 @@ define void @func(i32 %arg) {
 '''
 define void @func() {
   %aa = alloca i32
-  %load = load i32* %aa
+  %1 = load i32* %aa
   ret void
 }
 
@@ -2476,7 +2476,7 @@ define void @func() {
             assert not instr.GetVolatile()
             instr.SetVolatile(True)
             assert instr.GetVolatile()
-            self.assertDump(instr, '  %load = load volatile i32* %aa\n')
+            self.assertDump(instr, '  %1 = load volatile i32* %aa\n')
 
     def test_BuildStore(self):
         builder = self.builder
@@ -2569,7 +2569,7 @@ define void @func(i32 %arg) {
         assert instr2.GetOperand(2) is i32.ConstNull()
 
 
-        instr3 = builder.BuildGEP(ptr, [i64.ConstNull(), i32.ConstNull(), idx], 'gep3')
+        instr3 = builder.BuildGEP(ptr, [i64.ConstNull(), i32.ConstNull(), idx])
         assert isinstance(instr3, llpy.core.GetElementPtrInst)
         assert instr3.GetInstructionParent() is bb
         assert instr3.GetInstructionOpcode() == llpy.core.Opcode.GetElementPtr
@@ -2589,8 +2589,8 @@ define i32* @func({ [2 x i32] }* %ptr, i32 %idx) {
   %gep0 = getelementptr { [2 x i32] }* %ptr
   %gep1 = getelementptr { [2 x i32] }* %ptr, i64 0
   %gep2 = getelementptr { [2 x i32] }* %ptr, i64 0, i32 0
-  %gep3 = getelementptr { [2 x i32] }* %ptr, i64 0, i32 0, i32 %idx
-  ret i32* %gep3
+  %1 = getelementptr { [2 x i32] }* %ptr, i64 0, i32 0, i32 %idx
+  ret i32* %1
 }
 
 ''')
@@ -2647,7 +2647,7 @@ define i32* @func({ [2 x i32] }* %ptr, i32 %idx) {
         assert instr2.GetOperand(2) is i32.ConstNull()
 
 
-        instr3 = builder.BuildInBoundsGEP(ptr, [i64.ConstNull(), i32.ConstNull(), idx], 'gep3')
+        instr3 = builder.BuildInBoundsGEP(ptr, [i64.ConstNull(), i32.ConstNull(), idx])
         assert isinstance(instr3, llpy.core.GetElementPtrInst)
         assert instr3.GetInstructionParent() is bb
         assert instr3.GetInstructionOpcode() == llpy.core.Opcode.GetElementPtr
@@ -2667,8 +2667,8 @@ define i32* @func({ [2 x i32] }* %ptr, i32 %idx) {
   %gep0 = getelementptr inbounds { [2 x i32] }* %ptr
   %gep1 = getelementptr inbounds { [2 x i32] }* %ptr, i64 0
   %gep2 = getelementptr inbounds { [2 x i32] }* %ptr, i64 0, i32 0
-  %gep3 = getelementptr inbounds { [2 x i32] }* %ptr, i64 0, i32 0, i32 %idx
-  ret i32* %gep3
+  %1 = getelementptr inbounds { [2 x i32] }* %ptr, i64 0, i32 0, i32 %idx
+  ret i32* %1
 }
 
 ''')
