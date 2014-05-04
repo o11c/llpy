@@ -3211,7 +3211,7 @@ define i8* @func(i32* %rhs) {
         func_type = llpy.core.FunctionType(i1, [i2, i2])
 
         ins = [(x, i2.ConstInt(x)) for x in range(4)]
-        outs = [i1.ConstInt(x) for x in range(2)]
+        outs = [i1.ConstInt(bool(x)) for x in range(2)]
         for op, calc in [
             ['eq',  lambda x, y: x == y],
             ['ne',  lambda x, y: x != y],

@@ -367,6 +367,8 @@ class IntegerType(Type):
         ''' Obtain a constant value for an integer type.
         '''
         assert isinstance(value, int)
+        # might be a subclass, e.g. bool
+        value = int(value)
         # due to the python nature, this is probably more efficient than
         # converting to an array of uint64_t
         return self.ConstIntOfString(str(value), 10)
