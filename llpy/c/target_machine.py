@@ -27,6 +27,7 @@ from .core import _library, _version
 from .core import Bool
 from .core import Module
 from .core import MemoryBuffer
+from .core import PassManager
 
 from .target import TargetData
 
@@ -99,5 +100,8 @@ if (3, 1) <= _version:
     TargetMachineEmitToFile = _library.function(Bool, 'LLVMTargetMachineEmitToFile', [TargetMachine, Module, ctypes.c_char_p, CodeGenFileType, ctypes.POINTER(_c.string_buffer)])
 if (3, 3) <= _version:
     TargetMachineEmitToMemoryBuffer = _library.function(Bool, 'LLVMTargetMachineEmitToMemoryBuffer', [TargetMachine, Module, CodeGenFileType, ctypes.POINTER(_c.string_buffer), ctypes.POINTER(MemoryBuffer)])
+
 if (3, 4) <= _version:
     GetDefaultTargetTriple = _library.function(_c.string_buffer, 'LLVMGetDefaultTargetTriple', [])
+if (3, 5) <= _version:
+    AddAnalysisPasses = _library.function(None, 'LLVMAddAnalysisPasses', [TargetMachine, PassManager])

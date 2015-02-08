@@ -1,19 +1,24 @@
 language: python
 python:
+  - "pypy"
+  - "pypy3"
   - "2.7"
   - "3.2"
   - "3.3"
-# Travis doesn't support it yet
-#  - "3.4"
+  - "3.4"
+# http://docs.travis-ci.com/user/languages/python/
 install:
-  - sudo add-apt-repository --yes ppa:h-rayflood/llvm
+  - for PPA in $PPAS; do sudo add-apt-repository --yes $PPA; done
   - sudo apt-get update -qq
   - sudo apt-get install libllvm$LLPY_LLVM_VERSION
 script:
   - python ./runtests.py
 env:
-  - LLPY_LLVM_VERSION=3.0
-  - LLPY_LLVM_VERSION=3.1
-  - LLPY_LLVM_VERSION=3.2
-  - LLPY_LLVM_VERSION=3.3
-  - LLPY_LLVM_VERSION=3.4
+  - LLPY_LLVM_VERSION=3.0 PPAS=ppa:h-rayflood/llvm
+  - LLPY_LLVM_VERSION=3.1 PPAS=ppa:h-rayflood/llvm
+  - LLPY_LLVM_VERSION=3.2 PPAS=ppa:h-rayflood/llvm
+  - LLPY_LLVM_VERSION=3.3 PPAS=ppa:h-rayflood/llvm
+  - LLPY_LLVM_VERSION=3.4 PPAS=ppa:h-rayflood/llvm
+  - LLPY_LLVM_VERSION=3.5 PPAS='ppa:h-rayflood/llvm-upper ppa:h-rayflood/gcc-upper'
+# https://launchpad.net/~h-rayflood/+archive/ubuntu/llvm
+# https://launchpad.net/~h-rayflood/+archive/ubuntu/llvm-upper

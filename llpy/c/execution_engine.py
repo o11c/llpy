@@ -34,6 +34,8 @@ from .target import TargetData
 
 if (3, 3) <= _version:
     from .target_machine import CodeModel
+if (3, 5) <= _version:
+    from .target_machine import TargetMachine
 
 GenericValue = _c.opaque('GenericValue')
 ExecutionEngine = _c.opaque('ExecutionEngine')
@@ -103,6 +105,8 @@ RemoveModuleProvider = _library.function(Bool, 'LLVMRemoveModuleProvider', [Exec
 FindFunction = _library.function(Bool, 'LLVMFindFunction', [ExecutionEngine, ctypes.c_char_p, ctypes.POINTER(Value)])
 RecompileAndRelinkFunction = _library.function(ctypes.c_void_p, 'LLVMRecompileAndRelinkFunction', [ExecutionEngine, Value])
 GetExecutionEngineTargetData = _library.function(TargetData, 'LLVMGetExecutionEngineTargetData', [ExecutionEngine])
+if (3, 5) <= _version:
+    GetExecutionEngineTargetMachine = _library.function(TargetMachine, 'LLVMGetExecutionEngineTargetMachine', [ExecutionEngine])
 AddGlobalMapping = _library.function(None, 'LLVMAddGlobalMapping', [ExecutionEngine, Value, ctypes.c_void_p])
 GetPointerToGlobal = _library.function(ctypes.c_void_p, 'LLVMGetPointerToGlobal', [ExecutionEngine, Value])
 

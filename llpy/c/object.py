@@ -66,7 +66,9 @@ if (3, 1) <= _version:
 
     GetSymbolName = _library.function(ctypes.c_char_p, 'LLVMGetSymbolName', [SymbolIterator])
     GetSymbolAddress = _library.function(ctypes.c_uint64, 'LLVMGetSymbolAddress', [SymbolIterator])
+if (3, 1) <= _version <= (3, 4):
     GetSymbolFileOffset = _library.function(ctypes.c_uint64, 'LLVMGetSymbolFileOffset', [SymbolIterator])
+if (3, 1) <= _version:
     GetSymbolSize = _library.function(ctypes.c_uint64, 'LLVMGetSymbolSize', [SymbolIterator])
 
     GetRelocationAddress = _library.function(ctypes.c_uint64, 'LLVMGetRelocationAddress', [RelocationIterator])

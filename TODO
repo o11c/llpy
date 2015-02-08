@@ -1,5 +1,6 @@
 Bugs in LLVM:
-  - http://llvm.org/bugs/show_bug.cgi?id=17137
+  - http://llvm.org/bugs/show_bug.cgi?id=17137 (fixed in LLVM 3.5)
+  - http://llvm.org/bugs/show_bug.cgi?id=22525 (introduced in LLVM 3.5)
 Bugs in the LLVM C API:
   - Attribute.NonLazyBind
 Shortcomings of the LLVM C API:
@@ -17,3 +18,6 @@ Shortcomings based on sheer laziness:
   - several of the @untested remaining in core.py
 Shortcomings based on difficulty and scope:
   - verify the type of all arguments, so that it won't ever crash
+Versioning:
+  - LLVM 3.5 functionality supported at low-level.
+  - LLVM 3.3 functionality supported in wrappers.

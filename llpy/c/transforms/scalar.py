@@ -30,6 +30,9 @@ from ..core import PassManager
 AddAggressiveDCEPass = _library.function(None, 'LLVMAddAggressiveDCEPass', [PassManager])
 AddCFGSimplificationPass = _library.function(None, 'LLVMAddCFGSimplificationPass', [PassManager])
 AddDeadStoreEliminationPass = _library.function(None, 'LLVMAddDeadStoreEliminationPass', [PassManager])
+if (3, 5) <= _version:
+    AddScalarizerPass = _library.function(None, 'LLVMAddScalarizerPass', [PassManager])
+    AddMergedLoadStoreMotionPass = _library.function(None, 'LLVMAddMergedLoadStoreMotionPass', [PassManager])
 AddGVNPass = _library.function(None, 'LLVMAddGVNPass', [PassManager])
 AddIndVarSimplifyPass = _library.function(None, 'LLVMAddIndVarSimplifyPass', [PassManager])
 AddInstructionCombiningPass = _library.function(None, 'LLVMAddInstructionCombiningPass', [PassManager])

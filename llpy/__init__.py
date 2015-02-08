@@ -54,10 +54,13 @@ def allow_unknown_machines(value):
     global __allow_unknown_machines
     __allow_unknown_machines = bool(value)
 
-def set_library_pattern(fmt):
-    global __library_pattern
-    assert len(fmt.replace('%%', '').split('%d')) == 3
-    __library_pattern = fmt
+def set_library_patterns(llvm, lto):
+    global __library_pattern_llvm
+    global __library_pattern_lto
+    assert len(llvm.replace('%%', '').split('%d')) == 3
+    assert len(lto.replace('%%', '').split('%d')) == 3
+    __library_pattern_llvm = llvm
+    __library_pattern_lto = lto
 
 def set_llvm_version(version):
     global __library_version
@@ -68,6 +71,13 @@ def set_llvm_version(version):
         if version not in __TESTED_LLVM_VERSIONS:
             warnings.warn('Untested LLVM library version: %d.%d' % version)
     __library_version = version
+
+def __no_more_version_changes():
+    global set_library_patterns, set_llvm_version, __no_more_version_changes
+    del set_library_patterns
+    del set_llvm_version
+    def __no_more_version_changes():
+        pass
 
 __deprecate = False
 __untested = False
@@ -85,15 +95,18 @@ __TESTED_LLVM_VERSIONS = [
         (3, 2),
         (3, 3),
         (3, 4),
-        # (3, 5),
+        (3, 5),
+        # (3, 6),
 ]
 
 # Note: if adding windows support, also need to fix TODO in llpy/c/lto.py
 platforms = {
-    'linux': 'libLLVM-%d.%d.so.1',
+    'linux': {
+        'llvm': 'libLLVM-%d.%d.so.1',
+        'lto': '/usr/lib/llvm-%d.%d/lib/libLTO.so'
+    },
 }
 platforms['linux2'] = platforms['linux'] # python 3.2 and earlier
-# TODO LTO: '/usr/lib/llvm-%d.%d/lib/libLTO.so'
 
 # key is `uname -m` and value is `LLVM_NATIVE_ARCH` from llvm/Config/config.h
 # If allow_unknown_machines() is enabled, will fall back to "all arches".
@@ -102,6 +115,6 @@ machines = {
     'x86_64': 'X86',
 }
 
-set_library_pattern(platforms[sys.platform])
+set_library_patterns(**platforms[sys.platform])
 
 set_llvm_version(os.getenv('LLPY_LLVM_VERSION'))

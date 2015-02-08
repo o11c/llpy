@@ -4,12 +4,18 @@ import gc
 import unittest
 
 import llpy.core
+from llpy.core import _version
 import llpy.target
 
 class TestTargetData(unittest.TestCase):
 
     # the string for x86
-    tds = 'e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S128'
+    if _version <= (3, 0):
+        tds = 'e-p:32:32:32-S128-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f16:16:16-f128:128:128-f80:32:32-n8:16:32'
+    if (3, 1) <= _version <= (3, 4):
+        tds = 'e-p:32:32:32-S128-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f16:16:16-f32:32:32-f64:32:64-f128:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32'
+    if (3, 5) <= _version:
+        tds = 'e-p:32:32-f64:32:64-f80:32-n8:16:32-S128'
 
     def setUp(self):
         self.td = llpy.target.TargetData(self.tds)
@@ -23,7 +29,7 @@ class TestTargetData(unittest.TestCase):
         pass # needs pass manager
 
     def test_StringRep(self):
-        assert set(self.td.StringRep()) == set(self.tds)
+        assert self.td.StringRep() == self.tds
 
     def test_ByteOrder(self):
         assert self.td.ByteOrder() == llpy.target.ByteOrdering.LittleEndian
@@ -100,3 +106,6 @@ class TestTargetInit(unittest.TestCase):
 
     def test_init(self):
         pass
+
+if __name__ == '__main__':
+    unittest.main()

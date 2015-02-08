@@ -51,12 +51,26 @@ VariantKind_None = 0
 VariantKind_ARM_HI16 = 1
 VariantKind_ARM_LO16 = 2
 
+if (3, 5) <= _version:
+    VariantKind_ARM64_PAGE       = 1
+    VariantKind_ARM64_PAGEOFF    = 2
+    VariantKind_ARM64_GOTPAGE    = 3
+    VariantKind_ARM64_GOTPAGEOFF = 4
+    VariantKind_ARM64_TLVP       = 5
+    VariantKind_ARM64_TLVOFF     = 6
+
 SymbolLookupCallback = ctypes.CFUNCTYPE(ctypes.c_char_p, *[ctypes.c_void_p, ctypes.c_uint64, ctypes.POINTER(ctypes.c_uint64), ctypes.c_uint64, ctypes.POINTER(ctypes.c_char_p)])
 
 ReferenceType_InOut_None = 0
 
 ReferenceType_In_Branch = 1
 ReferenceType_In_PCrel_Load = 2
+if (3, 5) <= _version:
+    ReferenceType_In_ARM64_ADRP   = 0x100000001
+    ReferenceType_In_ARM64_ADDXri = 0x100000002
+    ReferenceType_In_ARM64_LDRXui = 0x100000003
+    ReferenceType_In_ARM64_LDRXl  = 0x100000004
+    ReferenceType_In_ARM64_ADR    = 0x100000005
 
 ReferenceType_Out_SymbolStub = 1
 ReferenceType_Out_LitPool_SymAddr = 2
@@ -67,6 +81,8 @@ if (3, 4) <= _version:
     ReferenceType_Out_Objc_Message_Ref = 6
     ReferenceType_Out_Objc_Selector_Ref = 7
     ReferenceType_Out_Objc_Class_Ref = 8
+if (3, 5) <= _version:
+    ReferenceType_DeMangled_Name = 9
 
 
 Option_UseMarkup = 1

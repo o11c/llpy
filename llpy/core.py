@@ -217,15 +217,17 @@ class Module(object):
         return Value(_core.GetLastGlobal(self._raw), self._context)
     # see class GlobalVariable for next/prev
 
-    def AddAlias(self, ty, val, name):
+    def AddAlias(self, val, name):
+        ty = val.TypeOf()
+        assert isinstance(ty, PointerType)
+        assert isinstance(val, Constant) # not GlobalObject, LLVM bug
         return Value(_core.AddAlias(self._raw, ty._raw, val._raw, u2b(name)), self._context)
 
     # from Analysis.h
-    def Verify(self, action):
+    def Verify(self, action=VerifierFailureAction.ReturnStatus):
         ''' Verifies that a module is valid, taking the specified action if
             not. Optionally returns a human-readable description of any
-            invalid constructs. OutMessage must be disposed with
-            LLVMDisposeMessage.
+            invalid constructs.
         '''
         error = _c.string_buffer()
         rv = bool(_analysis.VerifyModule(self._raw, action, ctypes.byref(error)))
@@ -852,6 +854,17 @@ class Value(object):
                 if _core.IsAConstantStruct(value): return ConstantStruct
                 if _core.IsAConstantVector(value): return ConstantVector
                 if _core.IsAGlobalValue(value):
+                    if _version <= (3, 4):
+                        if _core.IsAFunction(value): return Function
+                        if _core.IsAGlobalAlias(value): return GlobalAlias
+                        if _core.IsAGlobalVariable(value): return GlobalVariable
+                    if (3, 5) <= _version:
+                        if _core.IsAGlobalAlias(value): return GlobalAlias
+                        if _core.IsAGlobalObject(value):
+                            if _core.IsAFunction(value): return Function
+                            if _core.IsAGlobalVariable(value): return GlobalVariable
+                            assert unknown_values, 'Uh-oh, unknown GlobalObject subclass.'
+                            return GlobalObject
                     if _core.IsAFunction(value): return Function
                     if _core.IsAGlobalAlias(value): return GlobalAlias
                     if _core.IsAGlobalVariable(value): return GlobalVariable
@@ -859,7 +872,7 @@ class Value(object):
                     return GlobalValue
                 if _core.IsAUndefValue(value): return UndefValue
                 # As of LLVM 3.3, these still aren't exposed in the C API.
-                if True:
+                if _version <= (3, 3):
                     # can't do Type(_core.TypeOf(value))
                     # unless we also pass the (high-level) context.
                     tk = _core.GetTypeKind(_core.TypeOf(value))
@@ -867,6 +880,12 @@ class Value(object):
                         return ConstantDataVector
                     if tk == TypeKind.Array:
                         return ConstantDataArray
+                if (3, 4) <= _version:
+                    if _core.IsAConstantDataSequential(value):
+                        if _core.IsAConstantDataArray(value): return ConstantDataArray
+                        if _core.IsAConstantDataVector(value): return ConstantDataVector
+                        assert unknown_values, 'Uh-oh, unknown ConstantDataSequential subclass.'
+                        return ConstantDataSequential
                 assert unknown_values, 'Uh-oh, unknown Constant subclass.'
                 return Constant
             if _core.IsAInstruction(value):
@@ -1449,6 +1468,9 @@ ConstantExpr._subclasses[Opcode.GetElementPtr] = GetElementPtrConstantExpr
 # not used for normal unary things
 class    UnaryConstantExpr(ConstantExpr):
     __slots__ = ()
+    if _version <= (3, 4):
+        def _get_containing_object(self):
+            return self.GetOperand(0)._get_containing_object()
 class     UnaryTruncConstantExpr(UnaryConstantExpr):
     __slots__ = ()
 ConstantExpr._subclasses[Opcode.Trunc] = UnaryTruncConstantExpr
@@ -1602,9 +1624,6 @@ class   GlobalValue(Constant):
     def GetSection(self):
         return b2u(_core.GetSection(self._raw))
 
-    def SetSection(self, name):
-        _core.SetSection(self._raw, u2b(name))
-
     def GetVisibility(self):
         return _core.GetVisibility(self._raw)
 
@@ -1614,11 +1633,37 @@ class   GlobalValue(Constant):
     def GetAlignment(self):
         return _core.GetAlignment(self._raw)
 
+
+class    GlobalAlias(GlobalValue):
+    __slots__ = ()
+
+    # Aliases cannot have their own section/alignment, but LLVM prior to
+    # 3.5 stored one instead of returning the alignment from the object
+    # that they point to.
+    if _version <= (3, 4):
+        def _get_containing_object(self):
+            return self.GetOperand(0)._get_containing_object()
+
+        def GetSection(self):
+            return self._get_containing_object().GetSection()
+
+        def GetAlignment(self):
+            return self._get_containing_object().GetAlignment()
+
+class    GlobalObject(GlobalValue):
+    __slots__ = ()
+
+    if _version <= (3, 4):
+        def _get_containing_object(self):
+            return self
+
+    def SetSection(self, name):
+        _core.SetSection(self._raw, u2b(name))
+
     def SetAlignment(self, align):
         _core.SetAlignment(self._raw, align)
 
-
-class    Function(GlobalValue):
+class     Function(GlobalObject):
     __slots__ = ()
 
     def GetNextFunction(self):
@@ -1756,7 +1801,7 @@ class    Function(GlobalValue):
         ''' Obtain the first basic block in a function.
 
             The returned basic block can be used as an iterator. You will
-            likely eventually call into LLVMGetNextBasicBlock() with it.
+            likely eventually call into GetNextBasicBlock() with it.
         '''
         return Value(_core.BasicBlockAsValue(_core.GetFirstBasicBlock(self._raw)), self._context)
 
@@ -1798,10 +1843,7 @@ class    Function(GlobalValue):
         '''
         _analysis.ViewFunctionCFGOnly(self._raw)
 
-class    GlobalAlias(GlobalValue):
-    __slots__ = ()
-
-class    GlobalVariable(GlobalValue):
+class     GlobalVariable(GlobalObject):
     __slots__ = ()
 
     def GetNextGlobal(self):
@@ -1835,6 +1877,7 @@ class    GlobalVariable(GlobalValue):
 
     def SetConstant(self, is_c):
         _core.SetGlobalConstant(self._raw, is_c)
+
 
 class   UndefValue(Constant):
     __slots__ = ()
@@ -2028,12 +2071,12 @@ class   PHINode(Instruction):
         return _core.CountIncoming(self._raw)
 
     def GetIncomingValue(self, index):
-        ''' Obtain an incoming value to a PHI node as a LLVMValueRef.
+        ''' Obtain an incoming value to a PHI node as a Value.
         '''
         return Value(_core.GetIncomingValue(self._raw, index), self._context)
 
     def GetIncomingBlock(self, index):
-        ''' Obtain an incoming value to a PHI node as a LLVMBasicBlockRef.
+        ''' Obtain an incoming value to a PHI node as a BasicBlock.
         '''
         return Value(_core.BasicBlockAsValue(_core.GetIncomingBlock(self._raw, index)), self._context)
 

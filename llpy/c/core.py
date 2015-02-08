@@ -23,29 +23,14 @@ import ctypes
 
 from . import _c
 
-import llpy
-del llpy.set_library_pattern
-del llpy.set_llvm_version
-_version = llpy.__library_version
-if _version is not None:
-    _library = _c.Library(llpy.__library_pattern % _version)
-else:
-    e = None
-    for _version in reversed(llpy.__TESTED_LLVM_VERSIONS):
-        try:
-            _library = _c.Library(llpy.__library_pattern % _version)
-        except OSError as e_:
-            e = e_
-            continue
-        else:
-            del e
-            break
-    else:
-        raise e
-del llpy
+from ._c2 import _library, _version
 
 
-Bool = ctypes.c_int
+if (3, 5) <= _version:
+    from .support import Bool, MemoryBuffer
+
+if _version <= (3, 4):
+    Bool = ctypes.c_int
 
 Context = _c.opaque('Context')
 Module = _c.opaque('Module')
@@ -54,10 +39,13 @@ Value = _c.opaque('Value')
 BasicBlock = _c.opaque('BasicBlock')
 Builder = _c.opaque('Builder')
 ModuleProvider = _c.opaque('ModuleProvider')
-MemoryBuffer = _c.opaque('MemoryBuffer')
+if _version <= (3, 4):
+    MemoryBuffer = _c.opaque('MemoryBuffer')
 PassManager = _c.opaque('PassManager')
 PassRegistry = _c.opaque('PassRegistry')
 Use = _c.opaque('Use')
+if (3, 5) <= _version:
+    DiagnosticInfo = _c.opaque('DiagnosticInfo')
 
 attributes = dict(
     ZExt            = 1 << 0,   # int param, return, call
@@ -92,8 +80,8 @@ if _version <= (3, 0):
     )
 if (3, 1) <= _version:
     attributes.update(
-        NonLazyBind_buggy     = 1 << 31,  # function
-        #AddressSafety   = 1 << 32,  # function
+        NonLazyBind_buggy   = 1 << 31,  # function
+        #AddressSafety       = 1 << 32,  # function
     )
 if (3, 3) <= _version:
     attributes.update(
@@ -101,8 +89,15 @@ if (3, 3) <= _version:
     )
 if (3, 4) <= _version:
     attributes.update(
-        #Cold  = 1 << 34,           # function
-        #OptimizeNone  = 1 << 34,   # function
+        #Cold            = 1 << 34,  # function
+        #OptimizeNone    = 1 << 35,  # function
+    )
+if (3, 5) <= _version:
+    attributes.update(
+        #InAlloca        = 1 << 36,  # pointer param
+        #NonNull         = 1 << 37,  # pointer param, pointer return
+        #JumpTable       = 1 << 38,  # function
+        #Dereferenceable = 1 << 39,  # pointer param, pointer return - but needs size, passed how?
     )
 Attribute = _c.bit_enum('Attribute', **attributes)
 del attributes
@@ -238,8 +233,8 @@ linkages += [
     'Appending',
     'Internal',
     'Private',
-    'DLLImport',
-    'DLLExport',
+    'DLLImport', # Obsolete in 3.5
+    'DLLExport', # Obsolete in 3.5
     'ExternalWeak',
     'Ghost',
     'Common',
@@ -260,6 +255,15 @@ visibilities = [
 ]
 Visibility = _c.enum('Visibility', **{v: k for k, v in enumerate(visibilities)})
 del visibilities
+
+if (3, 5) <= _version:
+    dll_storage_classes = [
+        'Default',
+        'DLLImport',
+        'DLLExport',
+    ]
+    DLLStorageClass = _c.enum('DLLStorageClass', **{v: k for k, v in enumerate(dll_storage_classes)})
+    del dll_storage_classes
 
 call_convs = dict(
     C           = 0,
@@ -360,8 +364,22 @@ if (3, 3) <= _version:
     AtomicRMWBinOp = _c.enum('AtomicRMWBinOp', **{v: k for k, v in enumerate(atomic_rmw_binops)})
     del atomic_rmw_binops
 
+if (3, 5) <= _version:
+    diagnostic_severities = [
+        'Error',
+        'Warning',
+        'Remark',
+        'Note',
+    ]
+    DiagnosticSeverity = _c.enum('DiagnosticSeverity', **{v: k for k, v in enumerate(diagnostic_severities)})
+    del diagnostic_severities
+
 if (3, 4) <= _version:
     FatalErrorHandler = ctypes.CFUNCTYPE(None, *[ctypes.c_char_p])
+
+if (3, 5) <= _version:
+    DiagnosticHandler = ctypes.CFUNCTYPE(None, *[DiagnosticInfo, ctypes.c_void_p])
+    YieldCallback = ctypes.CFUNCTYPE(None, *[Context, ctypes.c_void_p])
 
 
 InitializeCore = _library.function(None, 'LLVMInitializeCore', [PassRegistry])
@@ -380,7 +398,14 @@ if (3, 4) <= _version:
 
 ContextCreate = _library.function(Context, 'LLVMContextCreate', [])
 GetGlobalContext = _library.function(Context, 'LLVMGetGlobalContext', [])
+if (3, 5) <= _version:
+    ContextSetDiagnosticHandler = _library.function(None, 'LLVMContextSetDiagnosticHandler', [Context, DiagnosticHandler, ctypes.c_void_p])
+    ContextSetYieldCallback = _library.function(None, 'LLVMContextSetYieldCallback', [Context, YieldCallback, ctypes.c_void_p])
 ContextDispose = _library.function(None, 'LLVMContextDispose', [Context])
+if (3, 5) <= _version:
+    GetDiagInfoDescription = _library.function(_c.string_buffer, 'LLVMGetDiagInfoDescription', [DiagnosticInfo])
+    GetDiagInfoSeverity = _library.function(DiagnosticSeverity, 'LLVMGetDiagInfoSeverity', [DiagnosticInfo])
+
 GetMDKindIDInContext = _library.function(ctypes.c_uint, 'LLVMGetMDKindIDInContext', [Context, ctypes.POINTER(ctypes.c_char), ctypes.c_uint])
 GetMDKindID = _library.function(ctypes.c_uint, 'LLVMGetMDKindID', [ctypes.POINTER(ctypes.c_char), ctypes.c_uint])
 
@@ -525,9 +550,15 @@ IsAConstantPointerNull = _library.function(Value, 'LLVMIsAConstantPointerNull', 
 IsAConstantStruct = _library.function(Value, 'LLVMIsAConstantStruct', [Value])
 IsAConstantVector = _library.function(Value, 'LLVMIsAConstantVector', [Value])
 IsAGlobalValue = _library.function(Value, 'LLVMIsAGlobalValue', [Value])
-IsAFunction = _library.function(Value, 'LLVMIsAFunction', [Value])
+if _version <= (3, 4):
+    IsAFunction = _library.function(Value, 'LLVMIsAFunction', [Value])
 IsAGlobalAlias = _library.function(Value, 'LLVMIsAGlobalAlias', [Value])
-IsAGlobalVariable = _library.function(Value, 'LLVMIsAGlobalVariable', [Value])
+if _version <= (3, 4):
+    IsAGlobalVariable = _library.function(Value, 'LLVMIsAGlobalVariable', [Value])
+if (3, 5) <= _version:
+    IsAGlobalObject = _library.function(Value, 'LLVMIsAGlobalObject', [Value])
+    IsAFunction = _library.function(Value, 'LLVMIsAFunction', [Value])
+    IsAGlobalVariable = _library.function(Value, 'LLVMIsAGlobalVariable', [Value])
 IsAUndefValue = _library.function(Value, 'LLVMIsAUndefValue', [Value])
 IsAInstruction = _library.function(Value, 'LLVMIsAInstruction', [Value])
 IsABinaryOperator = _library.function(Value, 'LLVMIsABinaryOperator', [Value])
@@ -695,6 +726,12 @@ GetSection = _library.function(ctypes.c_char_p, 'LLVMGetSection', [Value])
 SetSection = _library.function(None, 'LLVMSetSection', [Value, ctypes.c_char_p])
 GetVisibility = _library.function(Visibility, 'LLVMGetVisibility', [Value])
 SetVisibility = _library.function(None, 'LLVMSetVisibility', [Value, Visibility])
+if (3, 5) <= _version:
+    GetDLLStorageClass = _library.function(DLLStorageClass, 'LLVMGetDLLStorageClass', [Value])
+    SetDLLStorageClass = _library.function(None, 'LLVMSetDLLStorageClass', [Value, DLLStorageClass])
+    HasUnnamedAddr = _library.function(Bool, 'LLVMHasUnnamedAddr', [Value])
+    SetUnnamedAddr = _library.function(None, 'LLVMSetUnnamedAddr', [Value, Bool])
+
 GetAlignment = _library.function(ctypes.c_uint, 'LLVMGetAlignment', [Value])
 SetAlignment = _library.function(None, 'LLVMSetAlignment', [Value, ctypes.c_uint])
 
@@ -927,6 +964,8 @@ BuildInsertValue = _library.function(Value, 'LLVMBuildInsertValue', [Builder, Va
 BuildIsNull = _library.function(Value, 'LLVMBuildIsNull', [Builder, Value, ctypes.c_char_p])
 BuildIsNotNull = _library.function(Value, 'LLVMBuildIsNotNull', [Builder, Value, ctypes.c_char_p])
 BuildPtrDiff = _library.function(Value, 'LLVMBuildPtrDiff', [Builder, Value, Value, ctypes.c_char_p])
+if (3, 5) <= _version:
+    BuildFence = _library.function(Value, 'LLVMBuildFence', [Builder, AtomicOrdering, Bool, ctypes.c_char_p])
 if (3, 3) <= _version:
     BuildAtomicRMW = _library.function(Value, 'LLVMBuildAtomicRMW', [Builder, AtomicRMWBinOp, Value, Value, AtomicOrdering, Bool])
 
@@ -946,8 +985,9 @@ DisposeMemoryBuffer = _library.function(None, 'LLVMDisposeMemoryBuffer', [Memory
 
 
 if (3, 3) <= _version:
-    _library.function(Bool, 'LLVMStartMultithreaded', [])
-    _library.function(None, 'LLVMStopMultithreaded', [])
+    _library.function(Bool, 'LLVMStartMultithreaded', []) # Deprecated in 3.5
+    _library.function(None, 'LLVMStopMultithreaded', []) # Deprecated in 3.5
+    # Instead there is a compile-time argument to determine this.
     _library.function(Bool, 'LLVMIsMultithreaded', [])
 
 

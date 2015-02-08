@@ -1,16 +1,16 @@
 Pure Python3 bindings for LLVM.
 
 These are a set of pure python bindings for LLVM. You can use them with
-whatever version of LLVM is installed on the user's system, instead of
-having to build NxM python C extensions.
+whatever version of LLVM and Python are installed on the user's system,
+instead of having to build NxM python C extensions.
 
 Currently, only Linux is supported, though porting is probably as simple
 as changing the library filenames. Debian and Ubuntu are the most tested.
 
-Python2 support is feasible, but would be complicated due to the int/long
-and str/unicode problems.
+Python2 seems to be working too, though obviously you have to be more
+careful about strings and ints.
 
 Current status:
-  - Supports Python 2.7 (experimental) or Python 3.2 or later
+  - Supports Python 2.7 or Python 3.2 or later, and Pypy in both modes.
   - Full safe wrappers for IR generation and writing.
-  - Raw bindings to all C APIs available
+  - Raw bindings to all C APIs available.

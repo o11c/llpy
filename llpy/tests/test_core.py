@@ -141,13 +141,13 @@ class TestModule(DumpTestCase):
 
     def test_data_layout(self):
         mod = self.mod
-        layout = 'foobarbaz'
+        layout = 'e'
         mod.SetDataLayout(layout)
         assert layout == mod.GetDataLayout()
 
         self.assertDump(mod,
 '''; ModuleID = 'TestModule'
-target datalayout = "foobarbaz"
+target datalayout = "e"
 ''')
 
     def test_target(self):
@@ -247,10 +247,8 @@ declare void @foo()
     def test_alias(self):
         i32 = llpy.core.IntegerType(self.ctx, 32)
         foo = self.mod.AddGlobal(i32, 'foo')
-        alias_foo = self.mod.AddAlias(i32, foo, 'foo_alias')
+        alias_foo = self.mod.AddAlias(foo, 'foo_alias')
         assert isinstance(alias_foo, llpy.core.GlobalAlias)
-        alias_val = self.mod.AddAlias(i32, i32.ConstAllOnes(), 'anon_alias')
-        assert isinstance(alias_val, llpy.core.GlobalAlias)
 
         self.assertDump(self.mod,
 '''; ModuleID = 'TestModule'
@@ -258,13 +256,20 @@ declare void @foo()
 @foo = external global i32
 
 @foo_alias = alias i32* @foo
-@anon_alias = alias i32 -1
 ''')
 
     def test_verify(self):
         self.mod.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
-        i32 = llpy.core.IntegerType(self.ctx, 32)
-        self.mod.AddAlias(i32, i32.ConstNull(), 'foo')
+
+        void = llpy.core.VoidType(self.ctx)
+        func_type = llpy.core.FunctionType(void, [])
+        func = self.mod.AddFunction(func_type, 'invalid_func')
+        bb = func.AppendBasicBlock('entry')
+        builder = llpy.core.IRBuilder(self.ctx)
+        builder.PositionBuilderAtEnd(bb)
+        builder.BuildUnreachable()
+        builder.BuildUnreachable() # oops :)
+
         with self.assertRaises(OSError):
             self.mod.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
 
@@ -5143,8 +5148,10 @@ declare i32 @func_decl() %s
                 ir = 'nonlazybind address_safety minsize'
             if (3, 3) <= _version <= (3, 3):
                 ir = 'minsize nobuiltin noduplicate nonlazybind returned sspstrong sanitize_address sanitize_thread sanitize_memory'
-            if (3, 4) <= _version:
+            if (3, 4) <= _version <= (3, 4):
                 ir = 'builtin cold minsize nobuiltin noduplicate nonlazybind optnone returned sspstrong sanitize_address sanitize_thread sanitize_memory'
+            if (3, 5) <= _version:
+                ir = 'builtin inalloca cold jumptable minsize nobuiltin noduplicate nonlazybind nonnull optnone returned sspstrong sanitize_address sanitize_thread sanitize_memory'
             at = Attribute.NonLazyBind_buggy
             f = self.func_decl
             assert f.GetAttr() == Attribute()
@@ -5185,6 +5192,10 @@ declare i32 @func_decl() #0
             irs = irs.replace('uwtable', 'sanitize_address sanitize_thread sanitize_memory uwtable')
         if (3, 4) <= _version:
             irs = irs.replace('optnone optsize', 'optsize optnone')
+        if (3, 5) <= _version:
+            irs = irs.replace('builtin cold', 'builtin inalloca cold')
+            irs = irs.replace('inlinehint minsize', 'inlinehint jumptable minsize')
+            irs = irs.replace('nonlazybind noredzone', 'nonlazybind nonnull noredzone')
         attrs |= Attribute.StackAlignment
         irs += ' alignstack(64)'
         f = self.func_decl
@@ -5285,15 +5296,16 @@ class TestGlobalAlias(DumpTestCase):
         self.var = self.mod.AddGlobal(self.i32, 'var')
 
     def test_decl(self):
-        a = self.mod.AddAlias(self.i32, self.func, 'func_alias')
+        a = self.mod.AddAlias(self.func, 'func_alias')
         assert not a.IsDeclaration()
         self.assertDump(a, '@func_alias = alias i32 ()* @func\n\n')
-        a = self.mod.AddAlias(self.i32, self.var, 'var_alias')
+        a = self.mod.AddAlias(self.var, 'var_alias')
         assert not a.IsDeclaration()
         self.assertDump(a, '@var_alias = alias i32* @var\n\n')
-        a = self.mod.AddAlias(self.i32, self.i32.ConstInt(2), 'val_alias')
+        i8p = llpy.core.PointerType(llpy.core.IntegerType(self.ctx, 8))
+        a = self.mod.AddAlias(self.var.ConstBitCast(i8p), 'bitcast_alias')
         assert not a.IsDeclaration()
-        self.assertDump(a, '@val_alias = alias i32 2\n\n')
+        self.assertDump(a, '@bitcast_alias = alias bitcast (i32* @var to i8*)\n\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalAlias'
 
@@ -5301,28 +5313,23 @@ class TestGlobalAlias(DumpTestCase):
 
 @func_alias = alias i32 ()* @func
 @var_alias = alias i32* @var
-@val_alias = alias i32 2
+@bitcast_alias = alias bitcast (i32* @var to i8*)
 
 declare i32 @func()
 ''')
 
     def test_linkage(self):
         Linkage = llpy.core.Linkage
-        a = self.mod.AddAlias(self.i32, self.func, 'func_alias')
+        a = self.mod.AddAlias(self.func, 'func_alias')
         assert a.GetLinkage() == Linkage.External
         a.SetLinkage(Linkage.Private)
         assert a.GetLinkage() == Linkage.Private
         self.assertDump(a, '@func_alias = alias private i32 ()* @func\n\n')
-        a = self.mod.AddAlias(self.i32, self.var, 'var_alias')
+        a = self.mod.AddAlias(self.var, 'var_alias')
         assert a.GetLinkage() == Linkage.External
         a.SetLinkage(Linkage.Private)
         assert a.GetLinkage() == Linkage.Private
         self.assertDump(a, '@var_alias = alias private i32* @var\n\n')
-        a = self.mod.AddAlias(self.i32, self.i32.ConstInt(2), 'val_alias')
-        assert a.GetLinkage() == Linkage.External
-        a.SetLinkage(Linkage.Private)
-        assert a.GetLinkage() == Linkage.Private
-        self.assertDump(a, '@val_alias = alias private i32 2\n\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalAlias'
 
@@ -5330,57 +5337,45 @@ declare i32 @func()
 
 @func_alias = alias private i32 ()* @func
 @var_alias = alias private i32* @var
-@val_alias = alias private i32 2
 
 declare i32 @func()
 ''')
 
     def test_section(self):
         # aliases have, but ignore, a section
-        a = self.mod.AddAlias(self.i32, self.func, 'func_alias')
+        a = self.mod.AddAlias(self.func, 'func_alias')
         assert a.GetSection() == ''
-        a.SetSection('foo')
+        self.func.SetSection('foo')
         assert a.GetSection() == 'foo'
         self.assertDump(a, '@func_alias = alias i32 ()* @func\n\n')
-        a = self.mod.AddAlias(self.i32, self.var, 'var_alias')
+        a = self.mod.AddAlias(self.var, 'var_alias')
         assert a.GetSection() == ''
-        a.SetSection('foo')
+        self.var.SetSection('foo')
         assert a.GetSection() == 'foo'
         self.assertDump(a, '@var_alias = alias i32* @var\n\n')
-        a = self.mod.AddAlias(self.i32, self.i32.ConstInt(2), 'val_alias')
-        assert a.GetSection() == ''
-        a.SetSection('foo')
-        assert a.GetSection() == 'foo'
-        self.assertDump(a, '@val_alias = alias i32 2\n\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalAlias'
 
-@var = external global i32
+@var = external global i32, section "foo"
 
 @func_alias = alias i32 ()* @func
 @var_alias = alias i32* @var
-@val_alias = alias i32 2
 
-declare i32 @func()
+declare i32 @func() section "foo"
 ''')
 
     def test_visibility(self):
         Visibility = llpy.core.Visibility
-        a = self.mod.AddAlias(self.i32, self.func, 'func_alias')
+        a = self.mod.AddAlias(self.func, 'func_alias')
         assert a.GetVisibility() == Visibility.Default
         a.SetVisibility(Visibility.Hidden)
         assert a.GetVisibility() == Visibility.Hidden
         self.assertDump(a, '@func_alias = hidden alias i32 ()* @func\n\n')
-        a = self.mod.AddAlias(self.i32, self.var, 'var_alias')
+        a = self.mod.AddAlias(self.var, 'var_alias')
         assert a.GetVisibility() == Visibility.Default
         a.SetVisibility(Visibility.Hidden)
         assert a.GetVisibility() == Visibility.Hidden
         self.assertDump(a, '@var_alias = hidden alias i32* @var\n\n')
-        a = self.mod.AddAlias(self.i32, self.i32.ConstInt(2), 'val_alias')
-        assert a.GetVisibility() == Visibility.Default
-        a.SetVisibility(Visibility.Hidden)
-        assert a.GetVisibility() == Visibility.Hidden
-        self.assertDump(a, '@val_alias = hidden alias i32 2\n\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalAlias'
 
@@ -5388,38 +5383,31 @@ declare i32 @func()
 
 @func_alias = hidden alias i32 ()* @func
 @var_alias = hidden alias i32* @var
-@val_alias = hidden alias i32 2
 
 declare i32 @func()
 ''')
 
     def test_alignment(self):
         # aliases have, but ignore, an alignment
-        a = self.mod.AddAlias(self.i32, self.func, 'func_alias')
+        a = self.mod.AddAlias(self.func, 'func_alias')
         assert a.GetAlignment() == 0
-        a.SetAlignment(1)
+        self.func.SetAlignment(1)
         assert a.GetAlignment() == 1
         self.assertDump(a, '@func_alias = alias i32 ()* @func\n\n')
-        a = self.mod.AddAlias(self.i32, self.var, 'var_alias')
+        a = self.mod.AddAlias(self.var, 'var_alias')
         assert a.GetAlignment() == 0
-        a.SetAlignment(1)
+        self.var.SetAlignment(1)
         assert a.GetAlignment() == 1
         self.assertDump(a, '@var_alias = alias i32* @var\n\n')
-        a = self.mod.AddAlias(self.i32, self.i32.ConstInt(2), 'val_alias')
-        assert a.GetAlignment() == 0
-        a.SetAlignment(1)
-        assert a.GetAlignment() == 1
-        self.assertDump(a, '@val_alias = alias i32 2\n\n')
         self.assertDump(self.mod,
 '''; ModuleID = 'TestGlobalAlias'
 
-@var = external global i32
+@var = external global i32, align 1
 
 @func_alias = alias i32 ()* @func
 @var_alias = alias i32* @var
-@val_alias = alias i32 2
 
-declare i32 @func()
+declare i32 @func() align 1
 ''')
 
     def tearDown(self):

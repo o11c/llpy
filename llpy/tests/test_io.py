@@ -45,3 +45,6 @@ class TestIO(unittest.TestCase):
     def test_error(self):
         with self.assertRaises(OSError):
             llpy.core.MemoryBuffer('/nonexistent/no-such-file')
+
+if __name__ == '__main__':
+    unittest.main()
