@@ -1,5 +1,5 @@
 #   -*- encoding: utf-8 -*-
-#   Copyright © 2013 Ben Longbons
+#   Copyright © 2013,2015 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
 #
@@ -185,6 +185,17 @@ if (3, 1) <= _version:
     InitializeAllAsmParsers = untested(InitializeAllAsmParsers)
     from llpy.c.target import InitializeAllDisassemblers
     InitializeAllDisassemblers = untested(InitializeAllDisassemblers)
+
+from llpy.c.target import InitializeNativeTarget
+InitializeNativeTarget = untested(InitializeNativeTarget)
+
+if (3, 4) <= _version:
+    from llpy.c.target import InitializeNativeAsmParser
+    InitializeNativeAsmParser = untested(InitializeNativeAsmParser)
+    from llpy.c.target import InitializeNativeAsmPrinter
+    InitializeNativeAsmPrinter = untested(InitializeNativeAsmPrinter)
+    from llpy.c.target import InitializeNativeDisassembler
+    InitializeNativeDisassembler = untested(InitializeNativeDisassembler)
 
 
 if (3, 1) <= _version:

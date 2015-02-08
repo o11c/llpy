@@ -1,5 +1,5 @@
 #   -*- encoding: utf-8 -*-
-#   Copyright © 2013-2014 Ben Longbons
+#   Copyright © 2013-2015 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
 #
@@ -20,6 +20,10 @@
 '''
 
 import ctypes
+import os
+import warnings
+
+import llpy
 
 from . import _c
 
@@ -29,6 +33,8 @@ from .core import Type
 from .core import Value
 from .core import PassManager
 
+
+del llpy.allow_unknown_machines
 
 byte_orderings = [
     'BigEndian',
@@ -159,33 +165,102 @@ if (3, 1) <= _version:
         for target in ALL_DISASSEMBLERS:
             globals()['Initialize%sDisassembler' % target]()
 
+_native = llpy.machines.get(os.uname()[4])
 
 # TODO in 3.4 you can maybe use GetDefaultTargetTriple?
-def InitializeNativeTarget_nyi():
-    if False: # have native target
-        'init native target info'
-        'init native target'
-        'init native mc'
-        return 0
-    return 1
+if not llpy.__allow_unknown_machines:
+    if _native is None or _native not in ALL_TARGETS:
+        msg = ('llpy does not know how to map `uname -m` (%s) to one of:\n%s\nPlease send a patch to the `machines` dict in llpy/__init__.py'
+                % (os.uname()[4], ', '.join(sorted(ALL_TARGETS))))
+        raise ImportError(msg)
+if _native is not None:
+    if _native not in ALL_TARGETS:
+        add_target(_native)
+        if _native in ALL_TARGETS:
+            warnings.warn('Native target is not recognized but does exist, please send patches!')
+        else:
+            warnings.warn('Native target is not recognized and does not exist!')
+            _native = None
+else:
+    warnings.warn('Unable to guess native target, please send patches!')
 
-def InitializeNativeAsmParser_nyi():
-    if False: # have native target
-        'init native asm parser'
-        return 0
-    return 1
+def InitializeNativeTarget():
+    if _native is not None:
+        if _native in ALL_TARGETS:
+            globals()['Initialize%sTargetInfo' % native]()
+            globals()['Initialize%sTarget' % native]()
+            globals()['Initialize%sMC' % native]()
+            return 0
+        else:
+            warnings.warn('Native target known but not found (???)')
+            return 1
+    else:
+        if llpy.__native_fallback_all:
+            warnings.warn('Unknown native target, falling back to all!')
+            InitializeAllTargetInfos()
+            InitializeAllTargets()
+            InitializeAllTargetMCs()
+            return 0
+        warnings.warn('Unknown native target and fallback disabled!')
+        return 1
 
-def InitializeNativeAsmPrinter_nyi():
-    if False: # have native target
-        'init native asm printer'
-        return 0
-    return 1
+if (3, 4) <= _version:
+    def InitializeNativeAsmParser():
+        if _native is not None:
+            if _native in ALL_ASM_PARSERS:
+                globals()['Initialize%sAsmParser' % _native]()
+                return 0
+            else:
+                if _native in ALL_TARGETS:
+                    warnings.warn('Native target does not support asm parsing')
+                else:
+                    warnings.warn('Native target known but not found (???)')
+                return 1
+        else:
+            if llpy.__native_fallback_all:
+                warnings.warn('Unknown native target, falling back to all!')
+                InitializeAllAsmParsers()
+                return 0
+            warnings.warn('Unknown native target and fallback disabled!')
+            return 1
 
-def InitializeNativeDisassembler_nyi():
-    if False: # have native target
-        'init native disassembler'
-        return 0
-    return 1
+    def InitializeNativeAsmPrinter():
+        if _native is not None:
+            if _native in ALL_ASM_PRINTERS:
+                globals()['Initialize%sAsmPrinter' % _native]()
+                return 0
+            else:
+                if _native in ALL_TARGETS:
+                    warnings.warn('Native target does not support asm printing')
+                else:
+                    warnings.warn('Native target known but not found (???)')
+                return 1
+        else:
+            if llpy.__native_fallback_all:
+                warnings.warn('Unknown native target, falling back to all!')
+                InitializeAllAsmPrinters()
+                return 0
+            warnings.warn('Unknown native target and fallback disabled!')
+            return 1
+
+    def InitializeNativeDisassembler():
+        if _native is not None:
+            if _native in ALL_DISASSEMBLERS:
+                globals()['Initialize%sDisassembler' % _native]()
+                return 0
+            else:
+                if _native in ALL_TARGETS:
+                    warnings.warn('Native target does not support disassembling')
+                else:
+                    warnings.warn('Native target known but not found (???)')
+                return 1
+        else:
+            if llpy.__native_fallback_all:
+                warnings.warn('Unknown native target, falling back to all!')
+                InitializeAllDisassemblers()
+                return 0
+            warnings.warn('Unknown native target and fallback disabled!')
+            return 1
 
 
 CreateTargetData = _library.function(TargetData, 'LLVMCreateTargetData', [ctypes.c_char_p])
