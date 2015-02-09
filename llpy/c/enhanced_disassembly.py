@@ -88,3 +88,7 @@ if (3, 1) <= _version <= (3, 2):
     EvaluateOperand = _library.function(ctypes.c_int, 'EDEvaluateOperand', [ctypes.POINTER(ctypes.c_uint64), Operand, RegisterReaderCallback, ctypes.c_void_p])
 
     # snip some stuff with __BLOCKS__. Objective-C?
+    # strings here so the C symbol table matches the py files
+    'EDBlockCreateInsts'
+    'EDBlockEvaluateOperand'
+    'EDBlockVisitTokens'
