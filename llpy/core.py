@@ -21,9 +21,12 @@
     Some classes include functions from headers other than llvm-c/Core.h
 '''
 
+from __future__ import unicode_literals
+
 import ctypes # some wrappers need to know
 import weakref
 
+from llpy.compat import unicode
 from llpy.utils import u2b, b2u, deprecated, untested, dangerous
 from llpy.c import (
         _c,
@@ -204,6 +207,12 @@ class Module(object):
         ''' Dump a representation of a module to stderr.
         '''
         _core.DumpModule(self._raw)
+
+    if (3, 4) <= _version:
+        def PrintToString(mod):
+            s = _core.PrintModuleToString(mod._raw)
+            s = _message_to_string(s)
+            return s
 
     def SetModuleInlineAsm(self, asm):
         ''' Set inline assembly for a module.
@@ -443,12 +452,12 @@ class IntegerType(Type):
         value = int(value)
         # due to the python nature, this is probably more efficient than
         # converting to an array of uint64_t
-        return self.ConstIntOfString(str(value), 10)
+        return self.ConstIntOfString(unicode(value), 10)
 
     def ConstIntOfString(self, value, radix):
         ''' Obtain a constant value for an integer parsed from a string.
         '''
-        assert isinstance(value, str)
+        assert isinstance(value, unicode)
         bvalue = u2b(value)
         blen = len(bvalue)
         return Value(_core.ConstIntOfStringAndSize(self._raw, bvalue, blen, radix), self._context)
@@ -473,7 +482,7 @@ class RealType(Type):
     def ConstRealOfString(self, value):
         ''' Obtain a constant for a floating point value parsed from a string.
         '''
-        assert isinstance(value, str)
+        assert isinstance(value, unicode)
         bvalue = u2b(value)
         blen = len(bvalue)
         return Value(_core.ConstRealOfStringAndSize(self._raw, bvalue, blen), self._context)
@@ -1046,6 +1055,12 @@ class Value(object):
     def Dump(self):
         _core.DumpValue(self._raw)
 
+    if (3, 4) <= _version:
+        def PrintToString(self):
+            s = _core.PrintValueToString(self._raw)
+            s = _message_to_string(s)
+            return s
+
     def ReplaceAllUsesWith(self, other):
         _core.ReplaceAllUsesWith(self._raw, other._raw)
 
@@ -1058,12 +1073,6 @@ class Value(object):
             instances until GetNextUse() returns None.
         '''
         return Use(_core.GetFirstUse(self._raw), self._context)
-
-    if (3, 4) <= _version:
-        def PrintToString(self):
-            s = _core.PrintValueToString(self._raw)
-            s = _message_to_string(s)
-            return s
 
 class Argument(Value):
     __slots__ = ()
@@ -2779,188 +2788,6 @@ def _message_to_string(message):
     # Don't panic.
     _core.DisposeMessage(message)
     return b2u(s)
-
-class MemoryBuffer(object):
-    __slots__ = ('_raw',)
-
-    def __init__(self, filename, body=None):
-        if body is not None:
-            assert filename is not None
-            assert (3, 3) <= _version
-            assert isinstance(body, bytes)
-            size = len(body)
-            filename = u2b(filename)
-            self._raw = _core.CreateMemoryBufferWithMemoryRangeCopy(body, size, filename)
-            return
-
-        self._raw = _core.MemoryBuffer()
-        error = _c.string_buffer()
-
-        if filename is not None:
-            rv = bool(_core.CreateMemoryBufferWithContentsOfFile(u2b(filename), ctypes.byref(self._raw), ctypes.byref(error)))
-        else:
-            rv = bool(_core.CreateMemoryBufferWithSTDIN(ctypes.byref(self._raw), ctypes.byref(error)))
-        error = _message_to_string(error)
-
-        if rv:
-            raise OSError(error)
-
-    if (3, 3) <= _version:
-        def Get(self):
-            ptr = _core.GetBufferStart(self._raw)
-            size = _core.GetBufferSize(self._raw)
-            arr = ctypes.cast(ptr, ctypes.POINTER(ctypes.c_char * size))
-            return arr.contents.raw
-
-    def __del__(self):
-        _core.DisposeMemoryBuffer(self._raw)
-
-class PassRegistry(object):
-    __slots__ = ('_raw',)
-
-    @untested
-    def __init__(self, raw):
-        assert isinstance(raw, _core.PassRegistry)
-        self._raw = raw
-
-    @staticmethod
-    @untested
-    def get_singleton_instance():
-        try:
-            return PassRegistry.singleton_instance
-        except AttributeError:
-            pass
-        raw = _core.GetGlobalPassRegistry()
-        PassRegistry.singleton_instance = PassRegistry(raw)
-
-    @untested
-    def InitializeCore(self):
-        _initialization.InitializeCore(self._raw)
-    @untested
-    def InitializeTransformUtils(self):
-        _initialization.InitializeTransformUtils(self._raw)
-
-    @untested
-    def InitializeScalarOpts(self):
-        _initialization.InitializeScalarOpts(self._raw)
-
-    if (3, 3) <= _version:
-        @untested
-        def InitializeObjCARCOpts(self):
-            _initialization.InitializeObjCARCOpts(self._raw)
-
-    if (3, 1) <= _version:
-        @untested
-        def InitializeVectorization(self):
-            _initialization.InitializeVectorization(self._raw)
-
-    @untested
-    def InitializeInstCombine(self):
-        _initialization.InitializeInstCombine(self._raw)
-
-    @untested
-    def InitializeIPO(self):
-        _initialization.InitializeIPO(self._raw)
-
-    @untested
-    def InitializeInstrumentation(self):
-        _initialization.InitializeInstrumentation(self._raw)
-
-    @untested
-    def InitializeAnalysis(self):
-        _initialization.InitializeAnalysis(self._raw)
-
-    @untested
-    def InitializeIPA(self):
-        _initialization.InitializeIPA(self._raw)
-
-    @untested
-    def InitializeCodeGen(self):
-        _initialization.InitializeCodeGen(self._raw)
-
-    @untested
-    def InitializeTarget(self):
-        _initialization.InitializeTarget(self._raw)
-
-
-class PassManagerBase(object):
-    __slots__ = ('_raw',)
-
-    @untested
-    def __init__(self, raw):
-        assert isinstance(raw, _core.PassManager)
-        self._raw = raw
-
-    @untested
-    def __del__(self):
-        ''' Frees the memory of a pass pipeline. For function pipelines,
-            does not free the module.
-        '''
-        _core.DisposePassManager(self._raw)
-
-class PassManager(PassManagerBase):
-    __slots__ = ()
-
-    @untested
-    def __init__(self):
-        ''' Constructs a new whole-module pass pipeline.
-
-            This type of pipeline is suitable for link-time optimization
-            and whole-module transformations.
-        '''
-        raw = _core.CreatePassManager()
-        PassManagerBase.__init__(self, raw)
-
-    @untested
-    def run(self, mod):
-        ''' Initializes, executes on the provided module, and finalizes all
-            of the passes scheduled in the pass manager.
-
-            Returns 1 if any of the passes modified the module, 0 otherwise.
-        '''
-        return bool(_core.RunPassManager(self._raw, mod._raw))
-
-class FunctionPassManager(PassManagerBase):
-    __slots__ = ()
-
-    @untested
-    def __init__(self, mod):
-        ''' Constructs a new function-by-function pass pipeline over the
-            module.
-
-            It does not take ownership of the module. This type of pipeline
-            is suitable for code generation and JIT compilation tasks.
-        '''
-        raw = _core.CreateFunctionPassManagerForModule(mod._raw)
-        PassManagerBase.__init__(self, raw)
-
-    @untested
-    def initialize(self):
-        ''' Initializes all of the function passes scheduled in the
-            function pass manager.
-
-            Returns 1 if any of the passes modified the module, 0 otherwise.
-        '''
-        return bool(_core.InitializeFunctionPassManager(self._raw))
-
-    @untested
-    def run(self, func):
-        ''' Executes all of the function passes scheduled in the
-            function pass manager on the provided function.
-
-            Returns 1 if any of the passes modified the function,
-            false otherwise.
-        '''
-        return bool(_core.RunFunctionPassManager(self._raw, func._raw))
-
-    @untested
-    def finalize(self):
-        ''' Finalizes all of the function passes scheduled in in the
-            function pass manager.
-
-            Returns 1 if any of the passes modified the module, 0 otherwise.
-        '''
-        return bool(_core.FinalizeFunctionPassManager(self._raw))
 
 if (3, 4) <= _version:
     _py_fatal_error_handler = None

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import unicode_literals
+
 import gc
 import os
 import tempfile
@@ -10,9 +12,10 @@ from llpy.core import _version
 import llpy.io
 
 from llpy.compat import TemporaryDirectory
-from llpy.utils import b2u
+from llpy.utils import u2b, b2u
 
 from .test_core import DumpTestCase
+
 
 def slurp(filename):
     with open(filename, 'rb') as f:
@@ -41,13 +44,14 @@ class TestIO(DumpTestCase):
             llpy.io.WriteBitcodeToFD(mod, os.open(path_fd, os.O_WRONLY | os.O_CREAT | os.O_EXCL), True)
             assert slurp(path_file) == slurp(path_fd)
 
-            mb = llpy.core.MemoryBuffer(path_file)
-            mod2 = llpy.io.ParseBitcode(ctx, mb)
-            assert mod2.GetTypeByName('Foo') is st
-            glo2 = mod2.GetNamedGlobal('goo')
-            assert glo2.GetInitializer().GetOperand(0) is glo2
+            mb = llpy.io.MemoryBuffer(path_file)
+        mod2 = llpy.io.ParseBitcode(ctx, mb)
+        assert mod2.GetTypeByName('Foo') is st
+        glo2 = mod2.GetNamedGlobal('goo')
+        assert glo2.GetInitializer().GetOperand(0) is glo2
 
     if (3, 2) <= _version:
+        @unittest.skip('NYI')
         def test_ir(self):
             ctx = llpy.core.Context()
             mod = llpy.core.Module(ctx, 'TestIO')
@@ -62,24 +66,32 @@ class TestIO(DumpTestCase):
                 llpy.io.PrintModuleToFile(mod, path_file)
                 txt = b2u(slurp(path_file))
             if (3, 4) <= _version:
-                assert txt == llpy.io.PrintModuleToString(mod)
+                assert txt == mod.PrintToString()
             self.assertDump(mod, txt)
+
+            if (3, 4) <= _version:
+                # Parsing is exposed in 3.4, MemoryBuffer from bytes in 3.3.
+                mb = llpy.io.MemoryBuffer(path_file, u2b(txt))
+                mod2 = llpy.io.ParseIR(ctx, mb)
+                assert mod2.GetTypeByName('Foo') is st
+                glo2 = mod2.GetNamedGlobal('goo')
+                assert glo2.GetInitializer().GetOperand(0) is glo2
 
     if (3, 3) <= _version:
         def test_mbuf(self):
             stuff = b'abc'
-            buf = llpy.core.MemoryBuffer('name', stuff)
+            buf = llpy.io.MemoryBuffer('name', stuff)
             assert buf.Get() == stuff
 
     @unittest.skip('NYI')
     def test_stdin(self):
         with ReplaceInFD(0) as f:
             f.write('contents')
-            mbuf = llpy.core.MemoryBuffer(None)
+            mbuf = llpy.io.MemoryBuffer(None)
 
     def test_error(self):
         with self.assertRaises(OSError):
-            llpy.core.MemoryBuffer('/nonexistent/no-such-file')
+            llpy.io.MemoryBuffer('/nonexistent/no-such-file')
 
 if __name__ == '__main__':
     unittest.main()

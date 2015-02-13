@@ -16,7 +16,9 @@
 #   You should have received a copy of the GNU Lesser General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-''' Wrap the C interface to the llvm-c/BitReader.h and llvm-c/BitWriter.h
+''' Wrap the C interface to the llvm IO.
+
+    The underlying functions are scattered among many headers.
 '''
 
 import ctypes
@@ -27,12 +29,49 @@ from llpy.c import (
         core as _core,
         bit_reader as _bit_reader,
         bit_writer as _bit_writer,
+        ir_reader as _ir_reader,
 )
 from llpy.core import (
         Module,
         _message_to_string,
         _version,
 )
+
+
+class MemoryBuffer(object):
+    __slots__ = ('_raw',)
+
+    def __init__(self, filename, body=None):
+        if body is not None:
+            assert filename is not None
+            assert (3, 3) <= _version
+            assert isinstance(body, bytes)
+            size = len(body)
+            filename = u2b(filename)
+            self._raw = _core.CreateMemoryBufferWithMemoryRangeCopy(body, size, filename)
+            return
+
+        self._raw = _core.MemoryBuffer()
+        error = _c.string_buffer()
+
+        if filename is not None:
+            rv = bool(_core.CreateMemoryBufferWithContentsOfFile(u2b(filename), ctypes.byref(self._raw), ctypes.byref(error)))
+        else:
+            rv = bool(_core.CreateMemoryBufferWithSTDIN(ctypes.byref(self._raw), ctypes.byref(error)))
+        error = _message_to_string(error)
+
+        if rv:
+            raise OSError(error)
+
+    if (3, 3) <= _version:
+        def Get(self):
+            ptr = _core.GetBufferStart(self._raw)
+            size = _core.GetBufferSize(self._raw)
+            arr = ctypes.cast(ptr, ctypes.POINTER(ctypes.c_char * size))
+            return arr.contents.raw
+
+    def __del__(self):
+        _core.DisposeMemoryBuffer(self._raw)
 
 
 def WriteBitcodeToFile(mod, path):
@@ -71,7 +110,14 @@ if (3, 2) <= _version:
             raise OSError(error)
 
 if (3, 4) <= _version:
-    def PrintModuleToString(mod):
-        s = _core.PrintModuleToString(mod._raw)
-        s = _message_to_string(s)
-        return s
+    def ParseIR(ctx, mbuf):
+        mod = _core.Module()
+        error = _c.string_buffer()
+        rv = bool(_ir_reader.ParseIRInContext(ctx._raw, mbuf._raw, ctypes.byref(mod), ctypes.byref(error)))
+        error = _message_to_string(error)
+        if rv:
+            raise OSError(error)
+        m = Module.__new__(Module)
+        m._raw = mod
+        m._context = ctx
+        return m

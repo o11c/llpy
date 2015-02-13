@@ -31,7 +31,9 @@ from llpy.c import (
 from llpy.core import (
         _message_to_string,
         _version,
+)
 
+from llpy.io import (
         MemoryBuffer,
 )
 from llpy.c.target import ByteOrdering

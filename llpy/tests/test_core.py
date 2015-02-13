@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import unicode_literals
+
 from functools import reduce
 import gc
 from itertools import product
@@ -8,7 +10,7 @@ import unittest
 
 import llpy.core
 from llpy.c.core import _version
-from llpy.compat import long
+from llpy.compat import long, unicode
 
 class ReplaceOutFD(object):
     ''' Capture output send to stderr via C functions
@@ -6235,7 +6237,7 @@ class TestLLVM(unittest.TestCase):
             llpy.core.EnablePrettyStackTrace()
 
         def test_load_library(self):
-            llpy.core.LoadLibraryPermanently(llpy.c.core._library._cdll._name)
+            llpy.core.LoadLibraryPermanently(unicode(llpy.c.core._library._cdll._name))
             with self.assertRaises(OSError):
                 llpy.core.LoadLibraryPermanently('/nonexistent')
 

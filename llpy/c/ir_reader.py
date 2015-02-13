@@ -1,3 +1,4 @@
+#   -*- encoding: utf-8 -*-
 #   Copyright © 2015 Ben Longbons
 #
 #   This file is part of Python3 bindings for LLVM.
@@ -33,4 +34,3 @@ from ..utils import cuntested as untested
 
 if (3, 4) <= _version:
     ParseIRInContext = _library.function(Bool, 'LLVMParseIRInContext', [Context, MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)])
-    ParseIRInContext = untested(ParseIRInContext)

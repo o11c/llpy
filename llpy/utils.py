@@ -24,10 +24,12 @@ import warnings
 
 import llpy
 
+from llpy.compat import unicode
+
 def u2b(u):
     ''' Convert a unicode string to bytes, without exception.
     '''
-    assert isinstance(u, str)
+    assert isinstance(u, unicode)
     return u.encode('utf-8', 'surrogateescape')
 
 def b2u(b):

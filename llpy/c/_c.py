@@ -49,6 +49,11 @@ class Library(object):
         fun.argtypes = args
         type(fun).__repr__ = c_func_repr
         fun._filename, fun._lineno, _, _ = traceback.extract_stack(limit=2)[0]
+        mod_name = 'llpy' + fun._filename.split('llpy')[-1]
+        mod_name = mod_name.split('.')[0]
+        mod_name = mod_name.replace('/', '.')
+        fun.__module__ = mod_name
+        fun.__qualname__ = fun.__name__
         return fun
 
 def opaque(name):

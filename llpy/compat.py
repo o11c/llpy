@@ -16,3 +16,8 @@ try:
     long = long
 except NameError:
     long = int
+
+try:
+    unicode = unicode
+except NameError:
+    unicode = str
