@@ -23,6 +23,7 @@
 
 import ctypes
 
+from llpy.compat import is_int
 from llpy.utils import u2b
 from llpy.c import (
         _c,
@@ -32,6 +33,7 @@ from llpy.c import (
         ir_reader as _ir_reader,
 )
 from llpy.core import (
+        Context,
         Module,
         _message_to_string,
         _version,
@@ -77,16 +79,22 @@ class MemoryBuffer(object):
 def WriteBitcodeToFile(mod, path):
     ''' Writes a module to the specified path.
     '''
+    assert isinstance(mod, Module)
     if _bit_writer.WriteBitcodeToFile(mod._raw, u2b(path)):
         raise OSError
 
 def WriteBitcodeToFD(mod, fd, close, unbuffered=False):
     ''' Writes a module to an open file descriptor.
     '''
+    assert isinstance(mod, Module)
+    assert is_int(fd)
+    assert isinstance(close, bool)
     if _bit_writer.WriteBitcodeToFD(mod._raw, fd, close, unbuffered):
         raise OSError
 
 def ParseBitcode(ctx, mbuf):
+    assert isinstance(ctx, Context)
+    assert isinstance(mbuf, MemoryBuffer)
     mod = _core.Module()
     error = _c.string_buffer()
     rv = bool(_bit_reader.ParseBitcodeInContext(ctx._raw, mbuf._raw, ctypes.byref(mod), ctypes.byref(error)))
@@ -103,6 +111,7 @@ def ParseBitcode(ctx, mbuf):
 
 if (3, 2) <= _version:
     def PrintModuleToFile(mod, path):
+        assert isinstance(mod, Module)
         error = _c.string_buffer()
         rv = _core.PrintModuleToFile(mod._raw, u2b(path), ctypes.byref(error))
         error = _message_to_string(error)
@@ -111,6 +120,8 @@ if (3, 2) <= _version:
 
 if (3, 4) <= _version:
     def ParseIR(ctx, mbuf):
+        assert isinstance(ctx, Context)
+        assert isinstance(mbuf, MemoryBuffer)
         mod = _core.Module()
         error = _c.string_buffer()
         rv = bool(_ir_reader.ParseIRInContext(ctx._raw, mbuf._raw, ctypes.byref(mod), ctypes.byref(error)))

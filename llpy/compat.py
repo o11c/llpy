@@ -21,3 +21,6 @@ try:
     unicode = unicode
 except NameError:
     unicode = str
+
+def is_int(v):
+    return type(v) == int

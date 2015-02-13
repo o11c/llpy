@@ -21,6 +21,7 @@
 
 import ctypes
 
+from llpy.compat import is_int
 from llpy.utils import b2u, u2b, untested
 from llpy.c import (
         _c,
@@ -29,6 +30,10 @@ from llpy.c import (
         target_machine as _machine,
 )
 from llpy.core import (
+        Type,
+        StructType,
+        GlobalVariable,
+
         _message_to_string,
         _version,
 )
@@ -57,6 +62,7 @@ class TargetData(object):
         ''' Adds target data information to a pass manager. This does not
             take ownership of the target data.
         '''
+        assert isinstance(pm, PassManager)
         _target.AddTargetData(self._raw, pm._raw)
 
     def StringRep(self):
@@ -75,6 +81,7 @@ class TargetData(object):
             ''' Returns the pointer size in bytes for a target for a
                 specified address space.
             '''
+            assert is_int(space)
             if space == 0:
                 return _target.PointerSize(self._raw)
             # messing with the global context here
@@ -85,6 +92,7 @@ class TargetData(object):
 
     if (3, 2) <= _version:
         def PointerSize(self, space=0):
+            assert is_int(space)
             ''' Returns the pointer size in bytes for a target for a
                 specified address space.
             '''
@@ -96,46 +104,57 @@ class TargetData(object):
     def SizeOfTypeInBits(self, ty):
         ''' Computes the size of a type in bytes for a target.
         '''
+        assert isinstance(ty, Type)
         return _target.SizeOfTypeInBits(self._raw, ty._raw)
 
     def StoreSizeOfType(self, ty):
         ''' Computes the storage size of a type in bytes for a target.
         '''
+        assert isinstance(ty, Type)
         return _target.StoreSizeOfType(self._raw, ty._raw)
 
     def ABISizeOfType(self, ty):
         ''' Computes the ABI size of a type in bytes for a target.
         '''
+        assert isinstance(ty, Type)
         return _target.ABISizeOfType(self._raw, ty._raw)
 
     def ABIAlignmentOfType(self, ty):
         ''' Computes the ABI alignment of a type in bytes for a target.
         '''
+        assert isinstance(ty, Type)
         return _target.ABIAlignmentOfType(self._raw, ty._raw)
 
     def CallFrameAlignmentOfType(self, ty):
         ''' Computes the call frame alignment of a type in bytes for a target.
         '''
+        assert isinstance(ty, Type)
         return _target.CallFrameAlignmentOfType(self._raw, ty._raw)
 
     def PreferredAlignmentOfType(self, ty):
         ''' Computes the preferred alignment of a type in bytes for a target.
         '''
+        assert isinstance(ty, Type)
         return _target.PreferredAlignmentOfType(self._raw, ty._raw)
 
     def PreferredAlignmentOfGlobal(self, val):
         ''' Computes the preferred alignment of a global variable in bytes for a target.
         '''
+        assert isinstance(val, GlobalVariable)
         return _target.PreferredAlignmentOfGlobal(self._raw, val._raw)
 
     def ElementAtOffset(self, ty, off):
         ''' Computes the structure element that contains the byte offset for a target.
         '''
+        assert isinstance(ty, StructType)
+        assert is_int(off)
         return _target.ElementAtOffset(self._raw, ty._raw, off)
 
     def OffsetOfElement(self, ty, eli):
         ''' Computes the byte offset of the indexed struct element for a target.
         '''
+        assert isinstance(ty, StructType)
+        assert is_int(eli)
         return _target.OffsetOfElement(self._raw, ty._raw, eli)
 
 # omit class TargetLibraryInfo, it appears to be unusable
@@ -256,6 +275,9 @@ if (3, 1) <= _version:
 
         @untested
         def __init__(self, target, triple, cpu, features, opt, reloc, codemodel):
+            assert isinstance(opt, CodeGenOptLevel)
+            assert isinstance(reloc, RelocMode)
+            assert isinstance(codemodel, CodeModel)
             self._raw = _machine.CreateTargetMachine(target._raw, u2b(triple), u2b(cpu), u2b(features), opt, reloc, codemodel)
 
         @untested
@@ -286,6 +308,8 @@ if (3, 1) <= _version:
 
         @untested
         def EmitToFile(self, mod, filename, codegen):
+            assert isinstance(mod, Module)
+            assert isinstance(codegen, CodeGenFileType)
             error = _c.string_buffer()
             rv = bool(_machine.TargetMachineEmitToFile(self._raw, mod._raw, u2b(filename), codegen, ctypes.byref(error)))
             error = _message_to_string(error)
@@ -295,6 +319,8 @@ if (3, 1) <= _version:
         if (3, 3) <= _version:
             @untested
             def EmitToMemoryBuffer(self, mod, codegen):
+                assert isinstance(mod, Module)
+                assert isinstance(codegen, CodeGenFileType)
                 error = _c.string_buffer()
                 raw_mb = _core.MemoryBuffer()
                 rv = bool(_machine.TargetMachineEmitToMemoryBuffer(self._raw, mod._raw, codegen, ctypes.byref(error), ctypes.byref(raw_mb)))

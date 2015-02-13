@@ -220,6 +220,7 @@ class ModulePassManager(PassManagerBase):
         raw = _core.CreatePassManager()
         PassManagerBase.__init__(self, raw)
         if builder is not None:
+            assert isinstance(builder, PassManagerBuilder)
             _pmb.PassManagerBuilderPopulateModulePassManager(builder._raw, self._raw)
 
     @untested
@@ -229,6 +230,7 @@ class ModulePassManager(PassManagerBase):
 
             Returns 1 if any of the passes modified the module, 0 otherwise.
         '''
+        assert isinstance(mod, Module)
         return bool(_core.RunPassManager(self._raw, mod._raw))
 
 class FunctionPassManager(PassManagerBase):
@@ -242,9 +244,11 @@ class FunctionPassManager(PassManagerBase):
             It does not take ownership of the module. This type of pipeline
             is suitable for code generation and JIT compilation tasks.
         '''
+        assert isinstance(mod, Module)
         raw = _core.CreateFunctionPassManagerForModule(mod._raw)
         PassManagerBase.__init__(self, raw)
         if builder is not None:
+            assert isinstance(builder, PassManagerBuilder)
             _pmb.PassManagerBuilderPopulateFunctionPassManager(builder._raw, self._raw)
 
     @untested
@@ -264,6 +268,7 @@ class FunctionPassManager(PassManagerBase):
             Returns 1 if any of the passes modified the function,
             false otherwise.
         '''
+        assert isinstance(func, Function)
         return bool(_core.RunFunctionPassManager(self._raw, func._raw))
 
     @untested
@@ -288,12 +293,12 @@ class PassManagerBuilder:
 
     @untested
     def SetOptLevel(self, level):
-        assert isinstance(level, int)
+        assert is_int(level)
         _pmb.PassManagerBuilderSetOptLevel(self._raw, level)
 
     @untested
     def SetSizeLevel(self, level):
-        assert isinstance(level, int)
+        assert is_int(level)
         _pmb.PassManagerBuilderSetSizeLevel(self._raw, level)
 
     @untested
@@ -313,5 +318,5 @@ class PassManagerBuilder:
 
     @untested
     def UseInlinerWithThreshold(self, level):
-        assert isinstance(level, int)
+        assert is_int(level)
         _pmb.PassManagerBuilderUseInlinerWithThreshold(self._raw, level)

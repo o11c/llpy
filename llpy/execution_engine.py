@@ -51,6 +51,7 @@ class GenericValue(object):
 
     @untested
     def __init__(self, ty, value):
+        assert isinstance(ty, Type)
         if isinstance(value, int):
             self._raw = _engine.CreateGenericValueOfInt(ty._raw, value, value < 0)
         elif isinstance(value, float):
@@ -69,7 +70,8 @@ class GenericValue(object):
 
     @untested
     def ToInt(self, signed):
-        rv = _engine.GenericValueToInt(self._raw, bool(signed))
+        assert isinstance(signed, bool)
+        rv = _engine.GenericValueToInt(self._raw, signed)
         if signed and rv >= 2 ** 63:
             rv -= 2 ** 64
         return rv
@@ -82,6 +84,7 @@ class GenericValue(object):
 
     @untested
     def ToFloat(self, ty):
+        assert isinstance(ty, Type)
         return _engine.GenericValueToFloat(ty._raw, self._raw)
 
 class ExecutionEngine(object):
@@ -93,6 +96,7 @@ class ExecutionEngine(object):
 
     @untested
     def __new__(cls, mod):
+        assert isinstance(mod, Module)
         assert cls is ExecutionEngine
         error = _c.string_buffer()
         ee = _engine.ExecutionEngine()
@@ -107,6 +111,7 @@ class ExecutionEngine(object):
     @staticmethod
     @untested
     def CreateInterpreter(mod):
+        assert isinstance(mod, Module)
         error = _c.string_buffer()
         ee = _engine.ExecutionEngine()
         rv = bool(_engine.CreateInterpreterForModule(ctypes.byref(ee), mod._raw, ctypes.byref(error)))
@@ -120,6 +125,8 @@ class ExecutionEngine(object):
     @staticmethod
     @untested
     def CreateJITCompiler(mod, opt):
+        assert isinstance(mod, Module)
+        assert is_int(opt)
         error = _c.string_buffer()
         ee = _engine.ExecutionEngine()
         rv = bool(_engine.CreateJITCompilerForModule(ctypes.byref(ee), mod._raw, opt, ctypes.byref(error)))
@@ -134,6 +141,8 @@ class ExecutionEngine(object):
         @staticmethod
         @untested
         def CreateMCJITCompiler(mod, mcjit_opt):
+            assert isinstance(mod, Module)
+            assert isinstance(mcjit_opt, MCJITCompilerOptions)
             error = _c.string_buffer()
             ee = _engine.ExecutionEngine()
             rv = bool(_engine.CreateMCJITCompilerForModule(ctypes.byref(ee), mod._raw, ctypes.byref(mcjit_opt), ctypes.sizeof(mcjit_opt), ctypes.byref(error)))
@@ -154,6 +163,7 @@ class ExecutionEngine(object):
 
     @untested
     def RunFunctionAsMain(self, func, args, env):
+        assert isinstance(func, Function)
         argv = [ctypes.c_char_p(u2b(a)) for a in args]
         argv.append(ctypes.c_char_p())
         envp = [ctypes.c_char_p(u2b('%s=%s' % kv)) for kv in env.items()]
@@ -166,6 +176,8 @@ class ExecutionEngine(object):
 
     @untested
     def RunFunction(self, func, gvalues):
+        assert isinstance(func, Function)
+        assert all(isinstance(v, GenericValue) for v in gvalues)
         vl = len(gvalues)
         vals = (_engine.GenericValue * vl)(*[v._raw for v in gvalues])
         rv = _engine.RunFunction(self._raw, func._raw, vl, vals)
@@ -175,14 +187,17 @@ class ExecutionEngine(object):
 
     @untested
     def FreeMachineCodeForFunction(self, func):
+        assert isinstance(func, Function)
         _engine.FreeMachineCodeForFunction(self._raw, func._raw)
 
     @untested
     def AddModule(self, mod):
+        assert isinstance(mod, Module)
         _engine.AddModule(self._raw, mod._raw)
 
     @untested
     def RemoveModule(self, mod):
+        assert isinstance(mod, Module)
         omod = _core.Module() # not useful these days
         error = _c.string_buffer()
         rv = bool(_engine.RemoveModule(self._raw, mod._raw, ctypes.byref(omod), ctypes.byref(error)))
@@ -201,8 +216,9 @@ class ExecutionEngine(object):
 
     @untested
     def RecompileAndRelinkFunction(self, func):
-        rp = _engine.RecompileAndRelinkFunction(self._raw, func._raw)
+        assert isinstance(func, Function)
         raise NotImplementedError
+        rp = _engine.RecompileAndRelinkFunction(self._raw, func._raw)
         return ctypes.cast(func.TypeOf().ctypes_type(), rp)
 
     @untested
@@ -210,12 +226,15 @@ class ExecutionEngine(object):
         raw_td = _engine.GetExecutionEngineTargetData(self._raw)
         return TargetData(_message_to_string(_target.CopyStringRepOfTargetData(raw_td)))
 
-    @untested
-    def AddGlobalMapping(self, glob, vp):
-        _engine.AddGlobalMapping(self._raw, glob._raw, vp)
+    if 0:
+        @untested
+        def AddGlobalMapping(self, glob, vp):
+            assert isinstance(glob, GlobalValue)
+            _engine.AddGlobalMapping(self._raw, glob._raw, vp)
 
     @untested
     def GetPointerToGlobal(self, glob):
-        rp = _engine.GetPointerToGlobal(self._raw, glob._raw)
+        assert isinstance(glob, GlobalValue)
         raise NotImplementedError
+        rp = _engine.GetPointerToGlobal(self._raw, glob._raw)
         return ctypes.cast(glob.TypeOf().ctypes_type(), rp)

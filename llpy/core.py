@@ -26,7 +26,7 @@ from __future__ import unicode_literals
 import ctypes # some wrappers need to know
 import weakref
 
-from llpy.compat import unicode
+from llpy.compat import unicode, is_int
 from llpy.utils import u2b, b2u, deprecated, untested, dangerous
 from llpy.c import (
         _c,
@@ -130,12 +130,15 @@ class Context(object):
         ''' Create a ConstantDataSequential with string content in the global context.
         '''
         bvalue = u2b(value)
+        assert isinstance(dont_null_terminate, bool)
         blen = len(bvalue)
-        return Value(_core.ConstStringInContext(self._raw, bvalue, blen, dont_null_terminate) , self)
+        return Value(_core.ConstStringInContext(self._raw, bvalue, blen, dont_null_terminate), self)
 
     def ConstStruct(self, values, packed=False):
         ''' Create an anonymous ConstantStruct with the specified values.
         '''
+        assert all(isinstance(v, Constant) for v in values)
+        assert isinstance(packed, bool)
         n = len(values)
         raw_values = (_core.Value * n)(*[i._raw for i in values])
         return Value(_core.ConstStructInContext(self._raw, raw_values, n, packed), self)
@@ -145,6 +148,7 @@ class Context(object):
         return Value(_core.MDStringInContext(self._raw, buf, len(buf)), self)
 
     def MDNode(self, values):
+        assert all(isinstance(v, Value) for v in values)
         n = len(values)
         raw_values = (_core.Value * n)(*[i._raw for i in values])
         return Value(_core.MDNodeInContext(self._raw, raw_values, n), self)
@@ -160,6 +164,7 @@ class Context(object):
         @untested
         def SetYieldCallback(self, callback):
             if callback is not None:
+                assert isinstance(callback, callable)
                 callback = YieldCallback(X_YieldCallback(self, callback))
             _core.ContextSetDiagnosticHandler(callback)
             self._yield_callback = callback
@@ -174,6 +179,7 @@ class Module(object):
     def __init__(self, context, name):
         ''' Create a new, empty module in a specific context.
         '''
+        assert isinstance(context, Context)
         bname = u2b(name)
         self._raw = _core.ModuleCreateWithNameInContext(bname, context._raw)
         self._context = context
@@ -256,6 +262,7 @@ class Module(object):
     def AddFunction(self, ftype, name):
         ''' Add a function to a module under a specified name.
         '''
+        assert isinstance(ftype, FunctionType)
         return Value(_core.AddFunction(self._raw, u2b(name), ftype._raw), self._context)
 
     def GetNamedFunction(self, name):
@@ -275,6 +282,8 @@ class Module(object):
     # see class Function for next/prev
 
     def AddGlobal(self, ty, name='', address_space=0):
+        assert isinstance(ty, Type)
+        assert is_int(address_space)
         return Value(_core.AddGlobalInAddressSpace(self._raw, ty._raw, u2b(name), address_space), self._context)
 
     def GetNamedGlobal(self, name):
@@ -299,6 +308,7 @@ class Module(object):
             not. Optionally returns a human-readable description of any
             invalid constructs.
         '''
+        assert isinstance(action, VerifierFailureAction)
         error = _c.string_buffer()
         rv = bool(_analysis.VerifyModule(self._raw, action, ctypes.byref(error)))
         error = _message_to_string(error)
@@ -391,6 +401,7 @@ class Type(object):
         ''' Create a ConstantArray from values.
         '''
         assert self.IsSized()
+        assert all(isinstance(v, Constant) for v in values)
         n = len(values)
         raw_values = (_core.Value * n)(*[i._raw for i in values])
         return Value(_core.ConstArray(self._raw, raw_values, n), self._context)
@@ -427,6 +438,8 @@ class IntegerType(Type):
         ''' Obtain an integer type from a context with specified bit width.
         '''
         assert cls is IntegerType
+        assert isinstance(context, Context)
+        assert is_int(bits)
         raw = _core.IntTypeInContext(context._raw, bits)
         self = Type.__new__(Type, raw, context)
         assert type(self) is IntegerType
@@ -447,17 +460,18 @@ class IntegerType(Type):
     def ConstInt(self, value):
         ''' Obtain a constant value for an integer type.
         '''
-        assert isinstance(value, int)
-        # might be a subclass, e.g. bool
-        value = int(value)
+        if isinstance(value, bool) and self.GetIntTypeWidth() == 1:
+            value = int(value)
+        assert is_int(value)
         # due to the python nature, this is probably more efficient than
         # converting to an array of uint64_t
         return self.ConstIntOfString(unicode(value), 10)
 
-    def ConstIntOfString(self, value, radix):
+    def ConstIntOfString(self, value, radix=10):
         ''' Obtain a constant value for an integer parsed from a string.
         '''
-        assert isinstance(value, unicode)
+        assert is_int(radix)
+        assert radix in {2, 8, 10, 16, 36}
         bvalue = u2b(value)
         blen = len(bvalue)
         return Value(_core.ConstIntOfStringAndSize(self._raw, bvalue, blen, radix), self._context)
@@ -482,7 +496,6 @@ class RealType(Type):
     def ConstRealOfString(self, value):
         ''' Obtain a constant for a floating point value parsed from a string.
         '''
-        assert isinstance(value, unicode)
         bvalue = u2b(value)
         blen = len(bvalue)
         return Value(_core.ConstRealOfStringAndSize(self._raw, bvalue, blen), self._context)
@@ -495,6 +508,7 @@ if (3, 1) <= _version:
             ''' Obtain a 16-bit floating point type from a context.
             '''
             assert cls is HalfType
+            assert isinstance(context, Context)
             raw = _core.HalfTypeInContext(context._raw)
             self = Type.__new__(Type, raw, context)
             assert type(self) is HalfType
@@ -512,6 +526,7 @@ class FloatType(RealType):
         ''' Obtain a 32-bit floating point type from a context.
         '''
         assert cls is FloatType
+        assert isinstance(context, Context)
         raw = _core.FloatTypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is FloatType
@@ -529,6 +544,7 @@ class DoubleType(RealType):
         ''' Obtain a 64-bit floating point type from a context.
         '''
         assert cls is DoubleType
+        assert isinstance(context, Context)
         raw = _core.DoubleTypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is DoubleType
@@ -546,6 +562,7 @@ class X86FP80Type(RealType):
         ''' Obtain a 80-bit floating point type (X87) from a context.
         '''
         assert cls is X86FP80Type
+        assert isinstance(context, Context)
         raw = _core.X86FP80TypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is X86FP80Type
@@ -564,6 +581,7 @@ class FP128Type(RealType):
             context.
         '''
         assert cls is FP128Type
+        assert isinstance(context, Context)
         raw = _core.FP128TypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is FP128Type
@@ -582,6 +600,7 @@ class PPCFP128Type(RealType):
             context.
         '''
         assert cls is PPCFP128Type
+        assert isinstance(context, Context)
         raw = _core.PPCFP128TypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is PPCFP128Type
@@ -602,6 +621,9 @@ class FunctionType(Type):
             parameter types, and whether the function is variadic.
         '''
         assert cls is FunctionType
+        assert isinstance(rt, Type)
+        assert all(isinstance(p, Type) for p in params)
+        assert isinstance(is_var_arg, bool)
         n = len(params)
         raw_params = (_core.Type * n)(*[i._raw for i in params])
         raw_ft = _core.FunctionType(rt._raw, raw_params, n, is_var_arg)
@@ -645,6 +667,9 @@ class StructType(Type):
             with or without a body.
         '''
         assert cls is StructType
+        assert isinstance(context, Context)
+        assert body is None or all(isinstance(t, Type) for t in body)
+        assert isinstance(packed, bool)
         if name is None:
             if body is None:
                 raise ValueError('At least one argument must not be None')
@@ -688,6 +713,8 @@ class StructType(Type):
 
             You should probably use the ctor instead.
         '''
+        assert all(isinstance(t, Type) and t.IsSized() for t in body)
+        assert isinstance(packed, bool)
         assert self.IsOpaqueStruct()
         num = len(body)
         raw_body = (_core.Type * num)(*[i._raw for i in body])
@@ -716,6 +743,7 @@ class StructType(Type):
     def ConstNamedStruct(self, values):
         ''' Create a non-anonymous ConstantStruct from values.
         '''
+        assert all(isinstance(v, Constant) for v in values)
         n = len(values)
         raw_values = (_core.Value * n)(*[i._raw for i in values])
         return Value(_core.ConstNamedStruct(self._raw, raw_values, n), self._context)
@@ -748,6 +776,8 @@ class ArrayType(SequentialType):
             exists in.
         '''
         assert cls is ArrayType
+        assert isinstance(elem, Type)
+        assert is_int(count)
         raw = _core.ArrayType(elem._raw, count)
         self = Type.__new__(Type, raw, elem._context)
         assert type(self) is ArrayType
@@ -773,6 +803,8 @@ class PointerType(SequentialType):
             exists in.
         '''
         assert cls is PointerType
+        assert isinstance(elem, Type)
+        assert is_int(addr_space)
         raw = _core.PointerType(elem._raw, addr_space)
         self = Type.__new__(Type, raw, elem._context)
         assert type(self) is PointerType
@@ -808,6 +840,8 @@ class VectorType(SequentialType):
             type exists in.
         '''
         assert cls is VectorType
+        assert isinstance(elem, Type)
+        assert is_int(count)
         raw = _core.VectorType(elem._raw, count)
         self = Type.__new__(Type, raw, elem._context)
         assert type(self) is VectorType
@@ -830,6 +864,7 @@ class VoidType(Type):
         ''' Create a void type in a context.
         '''
         assert cls is VoidType
+        assert isinstance(context, Context)
         raw = _core.VoidTypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is VoidType
@@ -847,6 +882,7 @@ class LabelType(Type):
         ''' Create a label type in a context.
         '''
         assert cls is LabelType
+        assert isinstance(context, Context)
         raw = _core.LabelTypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is LabelType
@@ -864,6 +900,7 @@ class X86MMXType(Type):
         ''' Create a X86 MMX type in a context.
         '''
         assert cls is X86MMXType
+        assert isinstance(context, Context)
         raw = _core.X86MMXTypeInContext(context._raw)
         self = Type.__new__(Type, raw, context)
         assert type(self) is X86MMXType
@@ -965,6 +1002,7 @@ class Value(object):
                 assert unknown_values, 'Uh-oh, unknown Constant subclass.'
                 return Constant
             if _core.IsAInstruction(value):
+                # TODO construct from opcode
                 if _core.IsABinaryOperator(value): return BinaryOperator
                 if _core.IsACallInst(value):
                     if _core.IsAIntrinsicInst(value):
@@ -1062,6 +1100,7 @@ class Value(object):
             return s
 
     def ReplaceAllUsesWith(self, other):
+        assert isinstance(other, Value)
         _core.ReplaceAllUsesWith(self._raw, other._raw)
 
     def GetFirstUse(self):
@@ -1095,11 +1134,13 @@ class Argument(Value):
     def AddAttribute(self, pa):
         ''' Add an attribute to a function argument.
         '''
+        assert isinstance(pa, Attribute)
         _core.AddAttribute(self._raw, pa)
 
     def RemoveAttribute(self, pa):
         ''' Remove an attribute from a function argument.
         '''
+        assert isinstance(pa, Attribute)
         _core.RemoveAttribute(self._raw, pa)
 
     def GetAttribute(self):
@@ -1110,6 +1151,7 @@ class Argument(Value):
     def SetParamAlignment(self, align):
         ''' Set the alignment for a function parameter.
         '''
+        assert is_int(align)
         _core.SetParamAlignment(self._raw, align)
 
 
@@ -1184,11 +1226,13 @@ class BasicBlock(Value):
     def MoveBasicBlockBefore(self, other):
         ''' Move a basic block to before another one.
         '''
+        assert isinstance(other, BasicBlock)
         _core.MoveBasicBlockBefore(self._raw_bb, other._raw_bb)
 
     def MoveBasicBlockAfter(self, other):
         ''' Move a basic block to after another one.
         '''
+        assert isinstance(other, BasicBlock)
         _core.MoveBasicBlockAfter(self._raw_bb, other._raw_bb)
 
     def GetFirstInstruction(self):
@@ -1209,6 +1253,8 @@ class InlineAsm(Value):
     def __new__(cls, fty, asm_string, constraints, has_side_effects, is_align_stack):
         assert cls == InlineAsm
         assert isinstance(fty, FunctionType)
+        assert isinstance(has_side_effects, bool)
+        assert isinstance(is_align_stack, bool)
         return Value(_core.ConstInlineAsm(fty._raw, u2b(asm_string), u2b(constraints), has_side_effects, is_align_stack), fty._context)
 
 class MDNode(Value):
@@ -1216,6 +1262,7 @@ class MDNode(Value):
 
     @untested
     def GetOperand(self, index):
+        assert is_int(index)
         return Value(_core.GetOperand(self._raw, index), self._context)
 
     @untested
@@ -1244,9 +1291,12 @@ class User(Value):
     __slots__ = ()
 
     def GetOperand(self, index):
+        assert is_int(index)
         return Value(_core.GetOperand(self._raw, index), self._context)
 
     def SetOperand(self, index, value):
+        assert is_int(index)
+        assert isinstance(value, Value)
         _core.SetOperand(self._raw, index, value._raw)
 
     def GetNumOperands(self):
@@ -1276,184 +1326,242 @@ class  Constant(User):
         return Value(_core.ConstNot(self._raw), self._context)
 
     def ConstAdd(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstAdd(self._raw, other._raw), self._context)
 
     def ConstNSWAdd(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstNSWAdd(self._raw, other._raw), self._context)
 
     def ConstNUWAdd(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstNUWAdd(self._raw, other._raw), self._context)
 
     def ConstFAdd(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstFAdd(self._raw, other._raw), self._context)
 
     def ConstSub(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstSub(self._raw, other._raw), self._context)
 
     def ConstNSWSub(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstNSWSub(self._raw, other._raw), self._context)
 
     def ConstNUWSub(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstNUWSub(self._raw, other._raw), self._context)
 
     def ConstFSub(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstFSub(self._raw, other._raw), self._context)
 
     def ConstMul(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstMul(self._raw, other._raw), self._context)
 
     def ConstNSWMul(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstNSWMul(self._raw, other._raw), self._context)
 
     def ConstNUWMul(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstNUWMul(self._raw, other._raw), self._context)
 
     def ConstFMul(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstFMul(self._raw, other._raw), self._context)
 
     def ConstUDiv(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstUDiv(self._raw, other._raw), self._context)
 
     def ConstSDiv(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstSDiv(self._raw, other._raw), self._context)
 
     def ConstExactSDiv(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstExactSDiv(self._raw, other._raw), self._context)
 
     def ConstFDiv(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstFDiv(self._raw, other._raw), self._context)
 
     def ConstURem(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstURem(self._raw, other._raw), self._context)
 
     def ConstSRem(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstSRem(self._raw, other._raw), self._context)
 
     def ConstFRem(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstFRem(self._raw, other._raw), self._context)
 
     def ConstAnd(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstAnd(self._raw, other._raw), self._context)
 
     def ConstOr(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstOr(self._raw, other._raw), self._context)
 
     def ConstXor(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstXor(self._raw, other._raw), self._context)
 
     def ConstICmp(self, ipred, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstICmp(ipred, self._raw, other._raw), self._context)
 
     def ConstFCmp(self, rpred, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstFCmp(rpred, self._raw, other._raw), self._context)
 
     def ConstShl(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstShl(self._raw, other._raw), self._context)
 
     def ConstLShr(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstLShr(self._raw, other._raw), self._context)
 
     def ConstAShr(self, other):
+        assert isinstance(other, Constant)
         return Value(_core.ConstAShr(self._raw, other._raw), self._context)
 
     def ConstGEP(self, indices):
+        assert all(isinstance(v, Constant) for v in indices)
         n = len(indices)
         raw_indices = (_core.Value * n)(*[i._raw for i in indices])
         return Value(_core.ConstGEP(self._raw, raw_indices, n), self._context)
 
     def ConstInBoundsGEP(self, indices):
+        assert all(isinstance(v, Constant) for v in indices)
         n = len(indices)
         raw_indices = (_core.Value * n)(*[i._raw for i in indices])
         return Value(_core.ConstInBoundsGEP(self._raw, raw_indices, n), self._context)
 
     def ConstTrunc(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstTrunc(self._raw, ty._raw), self._context)
 
     def ConstSExt(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstSExt(self._raw, ty._raw), self._context)
 
     def ConstZExt(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstZExt(self._raw, ty._raw), self._context)
 
     def ConstFPTrunc(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstFPTrunc(self._raw, ty._raw), self._context)
 
     def ConstFPExt(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstFPExt(self._raw, ty._raw), self._context)
 
     def ConstUIToFP(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstUIToFP(self._raw, ty._raw), self._context)
 
     def ConstSIToFP(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstSIToFP(self._raw, ty._raw), self._context)
 
     def ConstFPToUI(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstFPToUI(self._raw, ty._raw), self._context)
 
     def ConstFPToSI(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstFPToSI(self._raw, ty._raw), self._context)
 
     def ConstPtrToInt(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstPtrToInt(self._raw, ty._raw), self._context)
 
     def ConstIntToPtr(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstIntToPtr(self._raw, ty._raw), self._context)
 
     def ConstBitCast(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstBitCast(self._raw, ty._raw), self._context)
 
     if (3, 4) <= _version:
         def ConstAddrSpaceCast(self, ty):
+            assert isinstance(ty, Type)
             return Value(_core.ConstAddrSpaceCast(self._raw, ty._raw), self._context)
 
     @deprecated
     @untested
     def ConstZExtOrBitCast(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstZExtOrBitCast(self._raw, ty._raw), self._context)
 
     @deprecated
     @untested
     def ConstSExtOrBitCast(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstSExtOrBitCast(self._raw, ty._raw), self._context)
 
     @deprecated
     @untested
     def ConstTruncOrBitCast(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstTruncOrBitCast(self._raw, ty._raw), self._context)
 
     @deprecated
     @untested
     def ConstPointerCast(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstPointerCast(self._raw, ty._raw), self._context)
 
     @deprecated
     @untested
     def ConstIntCast(self, ty, is_signed):
+        assert isinstance(ty, Type)
         return Value(_core.ConstIntCast(self._raw, ty._raw, is_signed), self._context)
 
     @deprecated
     @untested
     def ConstFPCast(self, ty):
+        assert isinstance(ty, Type)
         return Value(_core.ConstFPCast(self._raw, ty._raw), self._context)
 
     def ConstSelect(self, if_true, if_false):
+        assert isinstance(if_true, Constant)
+        assert isinstance(if_false, Constant)
         return Value(_core.ConstSelect(self._raw, if_true._raw, if_false._raw), self._context)
 
     def ConstExtractElement(self, index):
+        assert isinstance(index, Constant)
         return Value(_core.ConstExtractElement(self._raw, index._raw), self._context)
 
     def ConstInsertElement(self, value, index):
+        assert isinstance(value, Constant)
+        assert isinstance(index, Constant)
         return Value(_core.ConstInsertElement(self._raw, value._raw, index._raw), self._context)
 
     def ConstShuffleVector(self, other, mask):
+        assert isinstance(other, Constant)
+        assert isinstance(mask, Constant)
         return Value(_core.ConstShuffleVector(self._raw, other._raw, mask._raw), self._context)
 
     def ConstExtractValue(self, indices):
+        assert all(is_int(v) for v in indices)
         n = len(indices)
         raw_indices = (ctypes.c_uint * n)(*indices)
         return Value(_core.ConstExtractValue(self._raw, raw_indices, n), self._context)
 
     def ConstInsertValue(self, value, indices):
+        assert isinstance(value, Constant)
+        assert all(is_int(v) for v in indices)
         n = len(indices)
         raw_indices = (ctypes.c_uint * n)(*indices)
         return Value(_core.ConstInsertValue(self._raw, value._raw, raw_indices, n), self._context)
@@ -1482,6 +1590,7 @@ class   BlockAddress(Constant):
     __slots__ = ()
 
     def __new__(cls, bb):
+        assert isinstance(bb, BasicBlock)
         fv = bb.GetBasicBlockParent()
         return Value(_core.BlockAddress(fv._raw, bb._raw_bb), fv._context)
 
@@ -1734,6 +1843,7 @@ class   GlobalValue(Constant):
         return _core.GetLinkage(self._raw)
 
     def SetLinkage(self, linkage):
+        assert isinstance(linkage, Linkage)
         _core.SetLinkage(self._raw, linkage)
 
     def GetSection(self):
@@ -1743,6 +1853,7 @@ class   GlobalValue(Constant):
         return _core.GetVisibility(self._raw)
 
     def SetVisibility(self, viz):
+        assert isinstance(viz, Visibility)
         _core.SetVisibility(self._raw, viz)
 
     def GetAlignment(self):
@@ -1753,12 +1864,14 @@ class   GlobalValue(Constant):
             return _core.GetDLLStorageClass(self._raw)
 
         def SetDLLStorageClass(self, dllsc):
+            assert isinstance(dllsc, DLLStorageClass)
             _core.SetDLLStorageClass(self._raw, dllsc)
 
         def HasUnnamedAddr(self):
             return _core.HasUnnamedAddr(self._raw)
 
         def SetUnnamedAddr(self, ua):
+            assert isinstance(ua, bool)
             _core.SetUnnamedAddr(self._raw, ua)
 
 
@@ -1789,6 +1902,7 @@ class    GlobalObject(GlobalValue):
         _core.SetSection(self._raw, u2b(name))
 
     def SetAlignment(self, align):
+        assert is_int(align)
         _core.SetAlignment(self._raw, align)
 
 class     Function(GlobalObject):
@@ -1833,6 +1947,7 @@ class     Function(GlobalObject):
     def SetCallConv(self, cc):
         ''' Set the calling convention of a function.
         '''
+        assert isinstance(cc, CallConv)
         _core.SetFunctionCallConv(self._raw, cc)
 
     def GetGC(self):
@@ -1856,6 +1971,7 @@ class     Function(GlobalObject):
     def AddAttr(self, attr):
         ''' Add an attribute to a function.
         '''
+        assert isinstance(attr, Attribute)
         _core.AddFunctionAttr(self._raw, attr)
 
     def GetAttr(self):
@@ -1866,6 +1982,7 @@ class     Function(GlobalObject):
     def RemoveAttr(self, attr):
         ''' Remove an attribute from a function.
         '''
+        assert isinstance(attr, Attribute)
         _core.RemoveFunctionAttr(self._raw, attr)
 
     if (3, 3) <= _version:
@@ -1896,6 +2013,7 @@ class     Function(GlobalObject):
 
             Parameters are indexed from 0.
         '''
+        assert is_int(index)
         return Value(_core.GetParam(self._raw, index), self._context)
 
     # not sure it's actually worth exposing anything besides GetParams
@@ -1955,10 +2073,11 @@ class     Function(GlobalObject):
         return Value(_core.BasicBlockAsValue(_core.AppendBasicBlockInContext(self._context._raw, self._raw, u2b(name))), self._context)
 
     # from Analysis.h
-    def Verify(self, action):
+    def Verify(self, action=VerifierFailureAction.ReturnStatus):
         ''' Verifies that a single function is valid, taking the specified
             action. Useful for debugging.
         '''
+        assert isinstance(action, VerifierFailureAction)
         rv = bool(_analysis.VerifyFunction(self._raw, action))
 
         if rv:
@@ -1997,12 +2116,14 @@ class     GlobalVariable(GlobalObject):
         if val is None:
             _core.SetInitializer(self._raw, None)
         else:
+            assert isinstance(val, Value)
             _core.SetInitializer(self._raw, val._raw)
 
     def IsThreadLocal(self):
         return bool(_core.IsThreadLocal(self._raw))
 
     def SetThreadLocal(self, is_tl):
+        assert isinstance(is_tl, bool)
         _core.SetThreadLocal(self._raw, is_tl)
 
     if (3, 3) <= _version:
@@ -2010,18 +2131,21 @@ class     GlobalVariable(GlobalObject):
             return _core.GetThreadLocalMode(self._raw)
 
         def SetThreadLocalMode(self, tlm):
+            assert isinstance(tlm, ThreadLocalMode)
             _core.SetThreadLocalMode(self._raw, tlm)
 
         def IsExternallyInitialized(self):
             return _core.IsExternallyInitialized(self._raw)
 
         def SetExternallyInitialized(self, ei):
+            assert isinstance(ei, bool)
             _core.SetExternallyInitialized(self._raw, ei)
 
     def IsConstant(self):
         return bool(_core.IsGlobalConstant(self._raw))
 
     def SetConstant(self, is_c):
+        assert isinstance(is_c, bool)
         _core.SetGlobalConstant(self._raw, is_c)
 
 
@@ -2041,13 +2165,16 @@ class  Instruction(User):
     def GetMetadata(self, kind_id):
         ''' Return metadata associated with an instruction value.
         '''
-        return Value(_core.GetMetadata([Value, ctypes.c_uint]), self._context)
+        assert is_int(kind_id)
+        return Value(_core.GetMetadata(self._raw, kind_id), self._context)
 
     @untested
     def SetMetadata(self, kind_id, md):
         ''' Set metadata associated with an instruction value.
         '''
-        _core.SetMetadata([Value, ctypes.c_uint, Value])
+        assert is_int(kind_id)
+        assert isinstance(md, Metadata)
+        _core.SetMetadata(self._raw, kind_id, md._raw)
 
     def GetInstructionParent(self):
         ''' Obtain the basic block to which an instruction belongs.
@@ -2103,6 +2230,7 @@ class AnyCallOrInvoke(Value):
     def SetInstructionCallConv(self, cc):
         ''' Set the calling convention for a call instruction.
         '''
+        assert isinstance(cc, CallConv)
         _core.SetInstructionCallConv(self._raw, cc)
 
     @untested
@@ -2113,14 +2241,20 @@ class AnyCallOrInvoke(Value):
 
     @untested
     def AddInstrAttribute(self, index, attr):
+        assert is_int(index)
+        assert isinstance(attr, Attribute)
         _core.AddInstrAttribute(self._raw, index, attr)
 
     @untested
     def RemoveInstrAttribute(self, index, attr):
+        assert is_int(index)
+        assert isinstance(attr, Attribute)
         _core.RemoveInstrAttribute(self._raw, index, attr)
 
     @untested
     def SetInstrParamAlignment(self, index, align):
+        assert is_int(index)
+        assert is_int(align)
         _core.SetInstrParamAlignment(self._raw, index, align)
 
 class   CallInst(Instruction, AnyCallOrInvoke):
@@ -2136,6 +2270,7 @@ class   CallInst(Instruction, AnyCallOrInvoke):
     def SetTailCall(self, is_tc):
         ''' Set whether a call instruction is a tail call.
         '''
+        assert isinstance(is_tc, bool)
         _core.SetTailCall(self._raw, is_tc)
 
 class    IntrinsicInst(CallInst):
@@ -2193,10 +2328,12 @@ class   LandingPadInst(Instruction):
 
     @untested
     def AddClause(self, clause_val):
+        assert isinstance(clause_val, Constant)
         _core.AddClause(self._raw, clause_val._raw)
 
     @untested
     def SetCleanup(self, v):
+        assert isinstance(v, bool)
         _core.SetCleanup(self._raw, v)
 
 class   PHINode(Instruction):
@@ -2205,6 +2342,8 @@ class   PHINode(Instruction):
     def AddIncoming(self, values, blocks):
         ''' Add incoming values to the end of a PHI list.
         '''
+        assert all(isinstance(v, Value) for v in values)
+        assert all(isinstance(v, BasicBlock) for v in blocks)
         n = len(values)
         assert n == len(blocks)
         raw_values = (_core.Value * n)(*[i._raw for i in values])
@@ -2219,11 +2358,13 @@ class   PHINode(Instruction):
     def GetIncomingValue(self, index):
         ''' Obtain an incoming value to a PHI node as a Value.
         '''
+        assert is_int(index)
         return Value(_core.GetIncomingValue(self._raw, index), self._context)
 
     def GetIncomingBlock(self, index):
         ''' Obtain an incoming value to a PHI node as a BasicBlock.
         '''
+        assert is_int(index)
         return Value(_core.BasicBlockAsValue(_core.GetIncomingBlock(self._raw, index)), self._context)
 
 class   SelectInst(Instruction):
@@ -2240,10 +2381,21 @@ class AnyMemAccessInst(Value):
             return bool(_core.GetVolatile(self._raw))
 
         def SetVolatile(self, vol):
+            assert isinstance(vol, bool)
             _core.SetVolatile(self._raw, vol)
 
 class   StoreInst(Instruction, AnyMemAccessInst):
     __slots__ = ()
+
+    if (3, 4) <= _version:
+        @untested
+        def GetAlignment(self):
+            return _core.GetAlignment(self._raw)
+
+        @untested
+        def SetAlignment(self, align):
+            assert is_int(align)
+            _core.SetAlignment(self._raw, align)
 
 class   TerminatorInst(Instruction):
     __slots__ = ()
@@ -2255,6 +2407,7 @@ class    IndirectBrInst(TerminatorInst):
     __slots__ = ()
 
     def AddDestination(self, dest):
+        assert isinstance(dest, BasicBlock)
         _core.AddDestination(self._raw, dest._raw_bb)
 
 class    InvokeInst(TerminatorInst, AnyCallOrInvoke):
@@ -2271,6 +2424,8 @@ class    SwitchInst(TerminatorInst):
         return Value(_core.BasicBlockAsValue(_core.GetSwitchDefaultDest(self._raw)), self._context)
 
     def AddCase(self, onval, dest):
+        assert isinstance(onval, ConstantInt)
+        assert isinstance(dest, BasicBlock)
         _core.AddCase(self._raw, onval._raw, dest._raw_bb)
 
 class    UnreachableInst(TerminatorInst):
@@ -2285,6 +2440,16 @@ class   UnaryInstruction(Instruction):
 
 class    AllocaInst(UnaryInstruction):
     __slots__ = ()
+
+    if (3, 5) <= _version:
+        @untested
+        def GetAlignment(self):
+            return _core.GetAlignment(self._raw)
+
+        @untested
+        def SetAlignment(self, align):
+            assert is_int(align)
+            _core.SetAlignment(self._raw, align)
 
 class    CastInst(UnaryInstruction):
     __slots__ = ()
@@ -2334,6 +2499,16 @@ class    ExtractValueInst(UnaryInstruction):
 
 class    LoadInst(UnaryInstruction, AnyMemAccessInst):
     __slots__ = ()
+
+    if (3, 4) <= _version:
+        @untested
+        def GetAlignment(self):
+            return _core.GetAlignment(self._raw)
+
+        @untested
+        def SetAlignment(self, align):
+            assert is_int(align)
+            _core.SetAlignment(self._raw, align)
 
 class    VAArgInst(UnaryInstruction):
     __init__ = untested(lambda *args: None)
@@ -2389,6 +2564,7 @@ class Use(object):
 def ConstVector(values):
     ''' Create a ConstantVector from values.
     '''
+    assert all(isinstance(v, Constant) for v in values)
     n = len(values)
     assert n
     raw_values = (_core.Value * n)(*[i._raw for i in values])
@@ -2398,6 +2574,7 @@ class IRBuilder(object):
     __slots__ = ('_raw', '_context')
 
     def __init__(self, context):
+        assert isinstance(context, Context)
         self._raw = _core.CreateBuilderInContext(context._raw)
         self._context = context
 
@@ -2406,13 +2583,17 @@ class IRBuilder(object):
 
     @untested
     def PositionBuilder(self, block, instr):
+        assert isinstance(block, BasicBlock)
+        assert isinstance(instr, Instruction)
         _core.PositionBuilder(self._raw, block._raw_bb, instr._raw)
 
     @untested
     def PositionBuilderBefore(self, instr):
+        assert isinstance(instr, Instruction)
         _core.PositionBuilderBefore(self._raw, instr._raw)
 
     def PositionBuilderAtEnd(self, block):
+        assert isinstance(block, BasicBlock)
         _core.PositionBuilderAtEnd(self._raw, block._raw_bb)
 
     def GetInsertBlock(self):
@@ -2423,6 +2604,7 @@ class IRBuilder(object):
 
     @untested
     def InsertIntoBuilder(self, instr, name=None):
+        assert isinstance(instr, Instruction)
         if name is None:
             _core.InsertIntoBuilder(self._raw, instr._raw)
         else:
@@ -2431,6 +2613,7 @@ class IRBuilder(object):
     # Metadata
     @untested
     def SetCurrentDebugLocation(self, l):
+        assert isinstance(l, Value)
         _core.SetCurrentDebugLocation(self._raw, l._raw)
 
     @untested
@@ -2439,6 +2622,7 @@ class IRBuilder(object):
 
     @untested
     def SetInstDebugLocation(self, inst):
+        assert isinstance(inst, Instruction)
         _core.SetInstDebugLocation(self._raw, inst._raw)
 
     # Terminators
@@ -2446,37 +2630,56 @@ class IRBuilder(object):
         return Value(_core.BuildRetVoid(self._raw), self._context)
 
     def BuildRet(self, v):
+        assert isinstance(v, Value)
         return Value(_core.BuildRet(self._raw, v._raw), self._context)
 
     def BuildAggregateRet(self, values):
+        assert all(isinstance(v, Value) for v in values)
         n = len(values)
         raw_values = (_core.Value * n)(*[i._raw for i in values])
         return Value(_core.BuildAggregateRet(self._raw, raw_values, n), self._context)
 
     def BuildBr(self, dest):
+        assert isinstance(dest, BasicBlock)
         return Value(_core.BuildBr(self._raw, dest._raw_bb), self._context)
 
     def BuildCondBr(self, if_, then, else_):
+        assert isinstance(if_, Value)
+        assert isinstance(then, BasicBlock)
+        assert isinstance(else_, BasicBlock)
         return Value(_core.BuildCondBr(self._raw, if_._raw, then._raw_bb, else_._raw_bb), self._context)
 
-    def BuildSwitch(self, v, else_, n):
-        return Value(_core.BuildSwitch(self._raw, v._raw, else_._raw_bb, n), self._context)
+    def BuildSwitch(self, v, else_, hint=10):
+        assert isinstance(v, Value)
+        assert isinstance(else_, BasicBlock)
+        assert is_int(hint)
+        return Value(_core.BuildSwitch(self._raw, v._raw, else_._raw_bb, hint), self._context)
 
-    def BuildIndirectBr(self, addr, n):
-        return Value(_core.BuildIndirectBr(self._raw, addr._raw, n), self._context)
+    def BuildIndirectBr(self, addr, hint=10):
+        assert isinstance(addr, Value)
+        assert is_int(hint)
+        return Value(_core.BuildIndirectBr(self._raw, addr._raw, hint), self._context)
 
     @untested
-    def BuildInvoke(self, fn, args, then, catch, name):
+    def BuildInvoke(self, fn, args, then, catch, name=''):
+        assert isinstance(fn, Value)
+        assert all(isinstance(a, Value) for a in args)
+        assert isinstance(then, BasicBlock)
+        assert isinstance(catch, BasicBlock)
         n = len(args)
         raw_args = (_core.Value * n)(*[i._raw for i in args])
         return Value(_core.BuildInvoke(self._raw, fn._raw, raw_args, n, then._raw_bb, catch._raw_bb, u2b(name)), self._context)
 
     @untested
-    def BuildLandingPad(self, ty, persfn, n, name):
+    def BuildLandingPad(self, ty, persfn, n, name=''):
+        assert isinstance(ty, Type)
+        assert isinstance(persfn, Value)
+        assert is_int(n)
         return Value(_core.BuildLandingPad(self._raw, ty._raw, persfn._raw, n, u2b(name)), self._context)
 
     @untested
     def BuildResume(self, exn):
+        assert isinstance(exn, Value)
         return Value(_core.BuildResume(self._raw, exn._raw), self._context)
 
     def BuildUnreachable(self):
@@ -2484,140 +2687,213 @@ class IRBuilder(object):
 
     # Arithmetic
     def BuildAdd(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNSWAdd(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNSWAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNUWAdd(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNUWAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildFAdd(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildFAdd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildSub(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNSWSub(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNSWSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNUWSub(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNUWSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildFSub(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildFSub(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildMul(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNSWMul(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNSWMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNUWMul(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNUWMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildFMul(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildFMul(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildUDiv(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildUDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildSDiv(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildSDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildExactSDiv(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildExactSDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildFDiv(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildFDiv(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildURem(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildURem(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildSRem(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildSRem(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildFRem(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildFRem(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildShl(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildShl(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildLShr(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildLShr(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildAShr(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildAShr(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildAnd(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildAnd(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildOr(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildOr(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildXor(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildXor(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
-    def BuildBinOp(self, op, lhs, rhs, name):
+    def BuildBinOp(self, op, lhs, rhs, name=''):
+        assert isinstance(op, Opcode)
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildBinOp(self._raw, op, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNeg(self, rhs, name=''):
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNeg(self._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNSWNeg(self, rhs, name=''):
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNSWNeg(self._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNUWNeg(self, rhs, name=''):
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNUWNeg(self._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildFNeg(self, rhs, name=''):
+        assert isinstance(rhs, Value)
         return Value(_core.BuildFNeg(self._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildNot(self, rhs, name=''):
+        assert isinstance(rhs, Value)
         return Value(_core.BuildNot(self._raw, rhs._raw, u2b(name)), self._context)
 
     # Memory
     @dangerous # declares malloc() with wrong prototype
     @untested
-    def BuildMalloc(self, ty, name):
+    def BuildMalloc(self, ty, name=''):
+        assert isinstance(ty, Type)
         return Value(_core.BuildMalloc(self._raw, ty._raw, u2b(name)), self._context)
 
     @dangerous # as BuildMalloc
     @untested
-    def BuildArrayMalloc(self, ty, val, name):
+    def BuildArrayMalloc(self, ty, val, name=''):
+        assert isinstance(ty, Type)
+        assert isinstance(val, Value)
         return Value(_core.BuildArrayMalloc(self._raw, ty._raw, val._raw, u2b(name)), self._context)
 
     def BuildAlloca(self, ty, name=''):
+        assert isinstance(ty, Type)
         return Value(_core.BuildAlloca(self._raw, ty._raw, u2b(name)), self._context)
 
     def BuildArrayAlloca(self, ty, val, name=''):
+        assert isinstance(ty, Type)
+        assert isinstance(val, Value)
         return Value(_core.BuildArrayAlloca(self._raw, ty._raw, val._raw, u2b(name)), self._context)
 
     @dangerous # not really, just for symmetry with BuildMalloc
     @untested
     def BuildFree(self, ptr):
+        assert isinstance(ptr, Value)
         return Value(_core.BuildFree(self._raw, ptr._raw), self._context)
 
     def BuildLoad(self, ptr, name=''):
+        assert isinstance(ptr, Value)
         return Value(_core.BuildLoad(self._raw, ptr._raw, u2b(name)), self._context)
 
     def BuildStore(self, val, ptr):
+        assert isinstance(ptr, Value)
         return Value(_core.BuildStore(self._raw, val._raw, ptr._raw), self._context)
 
     def BuildGEP(self, ptr, indices, name=''):
+        assert isinstance(ptr, Value)
+        assert all(isinstance(i, Value) for i in indices)
         n = len(indices)
         raw_indices = (_core.Value * n)(*[i._raw for i in indices])
         return Value(_core.BuildGEP(self._raw, ptr._raw, raw_indices, n, u2b(name)), self._context)
 
     def BuildInBoundsGEP(self, ptr, indices, name=''):
+        assert isinstance(ptr, Value)
+        assert all(isinstance(i, Value) for i in indices)
         n = len(indices)
         raw_indices = (_core.Value * n)(*[i._raw for i in indices])
         return Value(_core.BuildInBoundsGEP(self._raw, ptr._raw, raw_indices, n, u2b(name)), self._context)
 
     @untested
     def BuildStructGEP(self, ptr, index, name=''):
+        assert isinstance(ptr, Value)
+        assert is_int(index)
         return Value(_core.BuildStructGEP(self._raw, ptr._raw, index, u2b(name)), self._context)
 
     def BuildGlobalString(self, s, name=''):
@@ -2628,129 +2904,205 @@ class IRBuilder(object):
 
     # Casts
     def BuildTrunc(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildTrunc(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildZExt(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildZExt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildSExt(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildSExt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildFPToUI(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildFPToUI(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildFPToSI(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildFPToSI(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildUIToFP(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildUIToFP(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildSIToFP(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildSIToFP(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildFPTrunc(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildFPTrunc(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildFPExt(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildFPExt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildPtrToInt(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildPtrToInt(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildIntToPtr(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildIntToPtr(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     def BuildBitCast(self, rhs, ty, name=''):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     if (3, 4) <= _version:
         def BuildAddrSpaceCast(self, rhs, ty, name=''):
+            assert isinstance(rhs, Value)
+            assert isinstance(ty, Type)
             return Value(_core.BuildAddrSpaceCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
     def BuildZExtOrBitCast(self, rhs, ty, name):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildZExtOrBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
     def BuildSExtOrBitCast(self, rhs, ty, name):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildSExtOrBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
     def BuildTruncOrBitCast(self, rhs, ty, name):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildTruncOrBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
     def BuildCast(self, op, rhs, ty, name):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildCast(self._raw, op, rhs._raw, ty._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
     def BuildPointerCast(self, rhs, ty, name):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildPointerCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
     def BuildIntCast(self, rhs, ty, name):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildIntCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     @deprecated
     @untested
     def BuildFPCast(self, rhs, ty, name):
+        assert isinstance(rhs, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildFPCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
     # Comparisons
     def BuildICmp(self, ipred, lhs, rhs, name=''):
+        assert isinstance(ipred, IntPredicate)
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildICmp(self._raw, ipred, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     def BuildFCmp(self, rpred, lhs, rhs, name=''):
+        assert isinstance(rpred, RealPredicate)
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildFCmp(self._raw, rpred, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     # Miscellaneous instructions
     def BuildPhi(self, ty, name=''):
+        assert isinstance(ty, Type)
         return Value(_core.BuildPhi(self._raw, ty._raw, u2b(name)), self._context)
 
     def BuildCall(self, fn, args, name=''):
+        assert isinstance(fn, Value)
+        assert all(isinstance(a, Value) for a in args)
         n = len(args)
         raw_args = (_core.Value * n)(*[i._raw for i in args])
         return Value(_core.BuildCall(self._raw, fn._raw, raw_args, n, u2b(name)), self._context)
 
     def BuildSelect(self, if_, then, else_, name=''):
+        assert isinstance(if_, Value)
+        assert isinstance(then, Value)
+        assert isinstance(else_, Value)
         return Value(_core.BuildSelect(self._raw, if_._raw, then._raw, else_._raw, u2b(name)), self._context)
 
     @untested
     def BuildVAArg(self, lst, ty, name):
+        assert isinstance(lst, Value)
+        assert isinstance(ty, Type)
         return Value(_core.BuildVAArg(self._raw, lst._raw, ty._raw, u2b(name)), self._context)
 
     def BuildExtractElement(self, vecval, index, name=''):
+        assert isinstance(vecval, Value)
+        assert isinstance(index, Value)
         return Value(_core.BuildExtractElement(self._raw, vecval._raw, index._raw, u2b(name)), self._context)
 
     def BuildInsertElement(self, vecval, eltval, index, name=''):
+        assert isinstance(vecval, Value)
+        assert isinstance(eltval, Value)
+        assert isinstance(index, Value)
         return Value(_core.BuildInsertElement(self._raw, vecval._raw, eltval._raw, index._raw, u2b(name)), self._context)
 
     def BuildShuffleVector(self, v1, v2, mask, name=''):
+        assert isinstance(v1, Value)
+        assert isinstance(v2, Value)
+        assert isinstance(mask, Value)
         return Value(_core.BuildShuffleVector(self._raw, v1._raw, v2._raw, mask._raw, u2b(name)), self._context)
 
     def BuildExtractValue(self, aggval, index, name=''):
+        assert isinstance(aggval, Value)
+        assert is_int(index)
         return Value(_core.BuildExtractValue(self._raw, aggval._raw, index, u2b(name)), self._context)
 
     def BuildInsertValue(self, aggval, eltval, index, name=''):
+        assert isinstance(aggval, Value)
+        assert isinstance(eltval, Value)
+        assert is_int(index)
         return Value(_core.BuildInsertValue(self._raw, aggval._raw, eltval._raw, index, u2b(name)), self._context)
 
     def BuildIsNull(self, val, name=''):
+        assert isinstance(val, Value)
         return Value(_core.BuildIsNull(self._raw, val._raw, u2b(name)), self._context)
 
     def BuildIsNotNull(self, val, name=''):
+        assert isinstance(val, Value)
         return Value(_core.BuildIsNotNull(self._raw, val._raw, u2b(name)), self._context)
 
     def BuildPtrDiff(self, lhs, rhs, name=''):
+        assert isinstance(lhs, Value)
+        assert isinstance(rhs, Value)
         return Value(_core.BuildPtrDiff(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
     if (3, 3) <= _version:
         def BuildAtomicRMW(self, op, ptr, val, order, single, name=''):
+            assert isinstance(op, AtomicRMWBinOp)
+            assert isinstance(ptr, Value)
+            assert isinstance(val, Value)
+            assert isinstance(order, AtomicOrdering)
+            assert isinstance(single, bool)
             rv = Value(_core.BuildAtomicRMW(self._raw, op, ptr._raw, val._raw, order, single), self._context)
             # This function from the C API doesn't include the name argument,
             # so make an extra call to set it.
@@ -2760,6 +3112,8 @@ class IRBuilder(object):
 
     if (3, 5) <= _version:
         def BuildFence(self, order, single):
+            assert isinstance(order, AtomicOrdering)
+            assert isinstance(single, bool)
             name = ''
             return Value(_core.BuildFence(self._raw, order, single, u2b(name)), self._context)
 
@@ -2768,6 +3122,7 @@ class ModuleProvider(object):
 
     @untested
     def __init__(self, mod):
+        assert isinstance(mod, Module)
         # Since LLVM 2.7, _raw and _mod are really the same pointer
         # This greatly simplifies the ownership semantics.
         self._raw = _core.CreateModuleProviderForExistingModule(mod._raw)
@@ -2782,6 +3137,7 @@ class ModuleProvider(object):
 def _message_to_string(message):
     ''' Convert an LLVM "message" to a python string, freeing the C version
     '''
+    assert isinstance(message, _c.string_buffer)
     if not message:
         return None
     s = ctypes.cast(message, ctypes.c_char_p).value
@@ -2801,6 +3157,7 @@ if (3, 4) <= _version:
     # TODO figure out whether it's even *possible* to test this?
     @untested
     def InstallFatalErrorHandler(handler):
+        assert isinstance(handler, callable)
         global _py_fatal_error_handler
         had = _py_fatal_error_handler is not None
         _py_fatal_error_handler = handler
