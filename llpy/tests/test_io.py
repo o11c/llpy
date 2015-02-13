@@ -14,7 +14,7 @@ import llpy.io
 from llpy.compat import TemporaryDirectory
 from llpy.utils import u2b, b2u
 
-from .test_core import DumpTestCase
+from .test_core_misc import DumpTestCase
 
 
 def slurp(filename):
