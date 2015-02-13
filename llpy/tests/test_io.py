@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 
+import gc
 import os
 import tempfile
 import unittest
 
 import llpy.core
+from llpy.core import _version
 import llpy.io
 
 from llpy.compat import TemporaryDirectory
+from llpy.utils import b2u
+
+from .test_core import DumpTestCase
 
 def slurp(filename):
     with open(filename, 'rb') as f:
         return f.read()
 
-class TestIO(unittest.TestCase):
+class TestIO(DumpTestCase):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
 
     def test_bc(self):
         ctx = llpy.core.Context()
@@ -35,6 +46,30 @@ class TestIO(unittest.TestCase):
             assert mod2.GetTypeByName('Foo') is st
             glo2 = mod2.GetNamedGlobal('goo')
             assert glo2.GetInitializer().GetOperand(0) is glo2
+
+    if (3, 2) <= _version:
+        def test_ir(self):
+            ctx = llpy.core.Context()
+            mod = llpy.core.Module(ctx, 'TestIO')
+            st = llpy.core.StructType(ctx, None, 'Foo')
+            stp = llpy.core.PointerType(st)
+            st.StructSetBody([stp])
+            glo = mod.AddGlobal(st, 'goo')
+            glo.SetInitializer(st.ConstNamedStruct([glo]))
+
+            with TemporaryDirectory() as tdn:
+                path_file = os.path.join(tdn, 'file')
+                llpy.io.PrintModuleToFile(mod, path_file)
+                txt = b2u(slurp(path_file))
+            if (3, 4) <= _version:
+                assert txt == llpy.io.PrintModuleToString(mod)
+            self.assertDump(mod, txt)
+
+    if (3, 3) <= _version:
+        def test_mbuf(self):
+            stuff = b'abc'
+            buf = llpy.core.MemoryBuffer('name', stuff)
+            assert buf.Get() == stuff
 
     @unittest.skip('NYI')
     def test_stdin(self):

@@ -26,10 +26,15 @@ from .. import _c
 from ..core import _library, _version
 from ..core import PassManager
 
+from ...utils import cuntested as untested
+
 
 if (3, 1) <= _version:
     AddBBVectorizePass = _library.function(None, 'LLVMAddBBVectorizePass', [PassManager])
+    AddBBVectorizePass = untested(AddBBVectorizePass)
 if (3, 2) <= _version:
     AddLoopVectorizePass = _library.function(None, 'LLVMAddLoopVectorizePass', [PassManager])
+    AddLoopVectorizePass = untested(AddLoopVectorizePass)
 if (3, 3) <= _version:
     AddSLPVectorizePass = _library.function(None, 'LLVMAddSLPVectorizePass', [PassManager])
+    AddSLPVectorizePass = untested(AddSLPVectorizePass)

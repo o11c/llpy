@@ -101,6 +101,12 @@ class TestTargetData(unittest.TestCase):
 @unittest.skip('NYI')
 class TestTargetInit(unittest.TestCase):
 
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
+
     def test_add(self):
         pass
 

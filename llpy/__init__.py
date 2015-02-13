@@ -40,6 +40,10 @@ def allow_untested(value):
     global __untested
     __untested = bool(value)
 
+def allow_cuntested(value):
+    global __cuntested
+    __cuntested = bool(value)
+
 def ignore_danger(value):
     global __dangerous
     __dangerous = bool(value)
@@ -81,6 +85,7 @@ def __no_more_version_changes():
 
 __deprecate = False
 __untested = False
+__cuntested = False
 __dangerous = False
 __unknown_values = False
 

@@ -30,12 +30,19 @@ from .core import Module
 from .core import ModuleProvider
 from .core import MemoryBuffer
 
+from ..utils import cuntested as untested
+
 
 ParseBitcode = _library.function(Bool, 'LLVMParseBitcode', [MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)])
+ParseBitcode = untested(ParseBitcode)
 ParseBitcodeInContext = _library.function(Bool, 'LLVMParseBitcodeInContext', [Context, MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)])
-GetBitcodeModuleInContext = _library.function(Bool, 'LLVMGetBitcodeModuleInContext', [Context, MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)]);
-GetBitcodeModule = _library.function(Bool, 'LLVMGetBitcodeModule', [MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)]);
+GetBitcodeModuleInContext = _library.function(Bool, 'LLVMGetBitcodeModuleInContext', [Context, MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)])
+GetBitcodeModuleInContext = untested(GetBitcodeModuleInContext)
+GetBitcodeModule = _library.function(Bool, 'LLVMGetBitcodeModule', [MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)])
+GetBitcodeModule = untested(GetBitcodeModule)
 
 # deprecated
-GetBitcodeModuleProviderInContext = _library.function(Bool, 'LLVMGetBitcodeModuleProviderInContext', [Context, MemoryBuffer, ctypes.POINTER(ModuleProvider), ctypes.POINTER(_c.string_buffer)]);
-GetBitcodeModuleProvider = _library.function(Bool, 'LLVMGetBitcodeModuleProvider', [MemoryBuffer, ctypes.POINTER(ModuleProvider), ctypes.POINTER(_c.string_buffer)]);
+GetBitcodeModuleProviderInContext = _library.function(Bool, 'LLVMGetBitcodeModuleProviderInContext', [Context, MemoryBuffer, ctypes.POINTER(ModuleProvider), ctypes.POINTER(_c.string_buffer)])
+GetBitcodeModuleProviderInContext = untested(GetBitcodeModuleProviderInContext)
+GetBitcodeModuleProvider = _library.function(Bool, 'LLVMGetBitcodeModuleProvider', [MemoryBuffer, ctypes.POINTER(ModuleProvider), ctypes.POINTER(_c.string_buffer)])
+GetBitcodeModuleProvider = untested(GetBitcodeModuleProvider)

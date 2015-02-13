@@ -20,6 +20,19 @@
 '''
 
 import ctypes
+import traceback
+
+
+def c_type_name(ty):
+    if ty is None:
+        return 'void'
+    rv = ty.__name__
+    while rv.startswith('LP_'):
+        rv = rv[3:]
+        rv += '*'
+    return rv
+def c_func_repr(self):
+    return '<%s %s(%s)>' % (c_type_name(self.restype), self.__name__, ', '.join(c_type_name(a) for a in self.argtypes))
 
 class Library(object):
     __slots__ = ('_cdll',)
@@ -34,6 +47,8 @@ class Library(object):
         fun = getattr(self._cdll, name)
         fun.restype = rt
         fun.argtypes = args
+        type(fun).__repr__ = c_func_repr
+        fun._filename, fun._lineno, _, _ = traceback.extract_stack(limit=2)[0]
         return fun
 
 def opaque(name):

@@ -53,7 +53,7 @@ def deprecated(f):
     return inner
 
 def untested(f):
-    ''' Decorator to mark a function as untested.
+    ''' Decorator to mark a python function as untested.
     '''
     if llpy.__untested:
         return f
@@ -61,6 +61,19 @@ def untested(f):
     @functools.wraps(f)
     def inner(*args, **kwargs):
         t = (f.__name__, f.__code__.co_filename, f.__code__.co_firstlineno)
+        raise UserWarning('%r untested at %s:%d' % t)
+        return f(*args, **kwargs) # unreachable
+    return inner
+
+def cuntested(f):
+    ''' Decorator to mark a C function as untested.
+    '''
+    if llpy.__cuntested:
+        return f
+
+    @functools.wraps(f)
+    def inner(*args, **kwargs):
+        t = (f.__name__, f._filename, f._lineno)
         raise UserWarning('%r untested at %s:%d' % t)
         return f(*args, **kwargs) # unreachable
     return inner

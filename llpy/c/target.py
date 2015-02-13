@@ -33,6 +33,8 @@ from .core import Type
 from .core import Value
 from .core import PassManager
 
+from ..utils import cuntested as untested
+
 
 del llpy.allow_unknown_machines
 
@@ -265,18 +267,24 @@ if (3, 4) <= _version:
 
 CreateTargetData = _library.function(TargetData, 'LLVMCreateTargetData', [ctypes.c_char_p])
 AddTargetData = _library.function(None, 'LLVMAddTargetData', [TargetData, PassManager])
+AddTargetData = untested(AddTargetData)
 AddTargetLibraryInfo = _library.function(None, 'LLVMAddTargetLibraryInfo', [TargetLibraryInfo, PassManager])
+AddTargetLibraryInfo = untested(AddTargetLibraryInfo)
 CopyStringRepOfTargetData = _library.function(_c.string_buffer, 'LLVMCopyStringRepOfTargetData', [TargetData])
 ByteOrder = _library.function(ByteOrdering, 'LLVMByteOrder', [TargetData])
 PointerSize = _library.function(ctypes.c_uint, 'LLVMPointerSize', [TargetData])
 if (3, 2) <= _version:
     PointerSizeForAS = _library.function(ctypes.c_uint, 'LLVMPointerSizeForAS', [TargetData, ctypes.c_uint])
 IntPtrType = _library.function(Type, 'LLVMIntPtrType', [TargetData])
+IntPtrType = untested(IntPtrType)
 if (3, 2) <= _version:
     IntPtrTypeForAS = _library.function(Type, 'LLVMIntPtrTypeForAS', [TargetData, ctypes.c_uint])
+    IntPtrTypeForAS = untested(IntPtrTypeForAS)
 if (3, 4) <= _version:
     IntPtrTypeInContext = _library.function(Type, 'LLVMIntPtrTypeInContext', [Context, TargetData])
+    IntPtrTypeInContext = untested(IntPtrTypeInContext)
     IntPtrTypeForASInContext = _library.function(Type, 'LLVMIntPtrTypeForASInContext', [Context, TargetData, ctypes.c_uint])
+    IntPtrTypeForASInContext = untested(IntPtrTypeForASInContext)
 SizeOfTypeInBits = _library.function(ctypes.c_ulonglong, 'LLVMSizeOfTypeInBits', [TargetData, Type])
 StoreSizeOfType = _library.function(ctypes.c_ulonglong, 'LLVMStoreSizeOfType', [TargetData, Type])
 ABISizeOfType = _library.function(ctypes.c_ulonglong, 'LLVMABISizeOfType', [TargetData, Type])

@@ -30,7 +30,8 @@ from llpy.c import (
 )
 from llpy.core import (
         Module,
-        _message_to_string
+        _message_to_string,
+        _version,
 )
 
 
@@ -60,3 +61,17 @@ def ParseBitcode(ctx, mbuf):
 
 # The GetBitcodeModuleProvider function is lazy, but is not really
 # usable because it changes ownership (this is not documented!)
+
+if (3, 2) <= _version:
+    def PrintModuleToFile(mod, path):
+        error = _c.string_buffer()
+        rv = _core.PrintModuleToFile(mod._raw, u2b(path), ctypes.byref(error))
+        error = _message_to_string(error)
+        if rv:
+            raise OSError(error)
+
+if (3, 4) <= _version:
+    def PrintModuleToString(mod):
+        s = _core.PrintModuleToString(mod._raw)
+        s = _message_to_string(s)
+        return s

@@ -25,9 +25,11 @@ from . import _c
 
 from ._c2 import _library, _version
 
-
 if (3, 5) <= _version:
     from .support import Bool, MemoryBuffer
+
+from ..utils import cuntested as untested
+
 
 if _version <= (3, 4):
     Bool = ctypes.c_int
@@ -383,34 +385,47 @@ if (3, 5) <= _version:
 
 
 InitializeCore = _library.function(None, 'LLVMInitializeCore', [PassRegistry])
+InitializeCore = untested(InitializeCore)
 if (3, 3) <= _version:
     Shutdown = _library.function(None, 'LLVMShutdown', [])
+    Shutdown = untested(Shutdown)
 
 if (3, 4) <= _version:
     CreateMessage = _library.function(_c.string_buffer, 'LLVMCreateMessage', [ctypes.c_char_p])
+    CreateMessage = untested(CreateMessage)
 DisposeMessage = _library.function(None, 'LLVMDisposeMessage', [_c.string_buffer])
 if (3, 4) <= _version:
     InstallFatalErrorHandler = _library.function(None, 'LLVMInstallFatalErrorHandler', [FatalErrorHandler])
+    InstallFatalErrorHandler = untested(InstallFatalErrorHandler)
     ResetFatalErrorHandler = _library.function(None, 'LLVMResetFatalErrorHandler', [])
+    ResetFatalErrorHandler = untested(ResetFatalErrorHandler)
     EnablePrettyStackTrace = _library.function(None, 'LLVMEnablePrettyStackTrace', [])
+    EnablePrettyStackTrace = untested(EnablePrettyStackTrace)
 
 
 
 ContextCreate = _library.function(Context, 'LLVMContextCreate', [])
 GetGlobalContext = _library.function(Context, 'LLVMGetGlobalContext', [])
+GetGlobalContext = untested(GetGlobalContext)
 if (3, 5) <= _version:
     ContextSetDiagnosticHandler = _library.function(None, 'LLVMContextSetDiagnosticHandler', [Context, DiagnosticHandler, ctypes.c_void_p])
+    ContextSetDiagnosticHandler = untested(ContextSetDiagnosticHandler)
     ContextSetYieldCallback = _library.function(None, 'LLVMContextSetYieldCallback', [Context, YieldCallback, ctypes.c_void_p])
+    ContextSetYieldCallback = untested(ContextSetYieldCallback)
 ContextDispose = _library.function(None, 'LLVMContextDispose', [Context])
 if (3, 5) <= _version:
     GetDiagInfoDescription = _library.function(_c.string_buffer, 'LLVMGetDiagInfoDescription', [DiagnosticInfo])
+    GetDiagInfoDescription = untested(GetDiagInfoDescription)
     GetDiagInfoSeverity = _library.function(DiagnosticSeverity, 'LLVMGetDiagInfoSeverity', [DiagnosticInfo])
+    GetDiagInfoSeverity = untested(GetDiagInfoSeverity)
 
 GetMDKindIDInContext = _library.function(ctypes.c_uint, 'LLVMGetMDKindIDInContext', [Context, ctypes.POINTER(ctypes.c_char), ctypes.c_uint])
 GetMDKindID = _library.function(ctypes.c_uint, 'LLVMGetMDKindID', [ctypes.POINTER(ctypes.c_char), ctypes.c_uint])
+GetMDKindID = untested(GetMDKindID)
 
 
 ModuleCreateWithName = _library.function(Module, 'LLVMModuleCreateWithName', [ctypes.c_char_p])
+ModuleCreateWithName = untested(ModuleCreateWithName)
 ModuleCreateWithNameInContext = _library.function(Module, 'LLVMModuleCreateWithNameInContext', [ctypes.c_char_p, Context])
 DisposeModule = _library.function(None, 'LLVMDisposeModule', [Module])
 
@@ -425,6 +440,7 @@ if (3, 4) <= _version:
     PrintModuleToString = _library.function(_c.string_buffer, 'LLVMPrintModuleToString', [Module])
 SetModuleInlineAsm = _library.function(None, 'LLVMSetModuleInlineAsm', [Module, ctypes.c_char_p])
 GetModuleContext = _library.function(Context, 'LLVMGetModuleContext', [Module])
+GetModuleContext = untested(GetModuleContext)
 GetTypeByName = _library.function(Type, 'LLVMGetTypeByName', [Module, ctypes.c_char_p])
 
 GetNamedMetadataNumOperands = _library.function(ctypes.c_uint, 'LLVMGetNamedMetadataNumOperands', [Module, ctypes.c_char_p])
@@ -444,23 +460,34 @@ GetPreviousFunction = _library.function(Value, 'LLVMGetPreviousFunction', [Value
 GetTypeKind = _library.function(TypeKind, 'LLVMGetTypeKind', [Type])
 TypeIsSized = _library.function(Bool, 'LLVMTypeIsSized', [Type])
 GetTypeContext = _library.function(Context, 'LLVMGetTypeContext', [Type])
+GetTypeContext = untested(GetTypeContext)
 if (3, 4) <= _version:
     DumpType = _library.function(None, 'LLVMDumpType', [Type])
     PrintTypeToString = _library.function(_c.string_buffer, 'LLVMPrintTypeToString', [Type])
 
 Int1TypeInContext = _library.function(Type, 'LLVMInt1TypeInContext', [Context])
+Int1TypeInContext = untested(Int1TypeInContext)
 Int8TypeInContext = _library.function(Type, 'LLVMInt8TypeInContext', [Context])
+Int8TypeInContext = untested(Int8TypeInContext)
 Int16TypeInContext = _library.function(Type, 'LLVMInt16TypeInContext', [Context])
+Int16TypeInContext = untested(Int16TypeInContext)
 Int32TypeInContext = _library.function(Type, 'LLVMInt32TypeInContext', [Context])
+Int32TypeInContext = untested(Int32TypeInContext)
 Int64TypeInContext = _library.function(Type, 'LLVMInt64TypeInContext', [Context])
+Int64TypeInContext = untested(Int64TypeInContext)
 IntTypeInContext = _library.function(Type, 'LLVMIntTypeInContext', [Context, ctypes.c_uint])
 
 Int1Type = _library.function(Type, 'LLVMInt1Type', [])
+Int1Type = untested(Int1Type)
 Int8Type = _library.function(Type, 'LLVMInt8Type', [])
 Int16Type = _library.function(Type, 'LLVMInt16Type', [])
+Int16Type = untested(Int16Type)
 Int32Type = _library.function(Type, 'LLVMInt32Type', [])
+Int32Type = untested(Int32Type)
 Int64Type = _library.function(Type, 'LLVMInt64Type', [])
+Int64Type = untested(Int64Type)
 IntType = _library.function(Type, 'LLVMIntType', [ctypes.c_uint])
+IntType = untested(IntType)
 
 GetIntTypeWidth = _library.function(ctypes.c_uint, 'LLVMGetIntTypeWidth', [Type])
 
@@ -475,11 +502,17 @@ PPCFP128TypeInContext = _library.function(Type, 'LLVMPPCFP128TypeInContext', [Co
 
 if (3, 1) <= _version:
     HalfType = _library.function(Type, 'LLVMHalfType', [])
+    HalfType = untested(HalfType)
 FloatType = _library.function(Type, 'LLVMFloatType', [])
+FloatType = untested(FloatType)
 DoubleType = _library.function(Type, 'LLVMDoubleType', [])
+DoubleType = untested(DoubleType)
 X86FP80Type = _library.function(Type, 'LLVMX86FP80Type', [])
+X86FP80Type = untested(X86FP80Type)
 FP128Type = _library.function(Type, 'LLVMFP128Type', [])
+FP128Type = untested(FP128Type)
 PPCFP128Type = _library.function(Type, 'LLVMPPCFP128Type', [])
+PPCFP128Type = untested(PPCFP128Type)
 
 
 FunctionType = _library.function(Type, 'LLVMFunctionType', [Type, ctypes.POINTER(Type), ctypes.c_uint, Bool])
@@ -491,6 +524,7 @@ GetParamTypes = _library.function(None, 'LLVMGetParamTypes', [Type, ctypes.POINT
 
 StructTypeInContext = _library.function(Type, 'LLVMStructTypeInContext', [Context, ctypes.POINTER(Type), ctypes.c_uint, Bool])
 StructType = _library.function(Type, 'LLVMStructType', [ctypes.POINTER(Type), ctypes.c_uint, Bool])
+StructType = untested(StructType)
 StructCreateNamed = _library.function(Type, 'LLVMStructCreateNamed', [Context, ctypes.c_char_p])
 GetStructName = _library.function(ctypes.c_char_p, 'LLVMGetStructName', [Type])
 StructSetBody = _library.function(None, 'LLVMStructSetBody', [Type, ctypes.POINTER(Type), ctypes.c_uint, Bool])
@@ -513,8 +547,11 @@ VoidTypeInContext = _library.function(Type, 'LLVMVoidTypeInContext', [Context])
 LabelTypeInContext = _library.function(Type, 'LLVMLabelTypeInContext', [Context])
 X86MMXTypeInContext = _library.function(Type, 'LLVMX86MMXTypeInContext', [Context])
 VoidType = _library.function(Type, 'LLVMVoidType', [])
+VoidType = untested(VoidType)
 LabelType = _library.function(Type, 'LLVMLabelType', [])
+LabelType = untested(LabelType)
 X86MMXType = _library.function(Type, 'LLVMX86MMXType', [])
+X86MMXType = untested(X86MMXType)
 
 
 
@@ -523,7 +560,7 @@ GetValueName = _library.function(ctypes.c_char_p, 'LLVMGetValueName', [Value])
 SetValueName = _library.function(None, 'LLVMSetValueName', [Value, ctypes.c_char_p])
 DumpValue = _library.function(None, 'LLVMDumpValue', [Value])
 if (3, 4) <= _version:
-    PrintValueToString = _library.function(None, 'LLVMPrintValueToString', [Value])
+    PrintValueToString = _library.function(_c.string_buffer, 'LLVMPrintValueToString', [Value])
 ReplaceAllUsesWith = _library.function(None, 'LLVMReplaceAllUsesWith', [Value, Value])
 IsConstant = _library.function(Bool, 'LLVMIsConstant', [Value])
 IsUndef = _library.function(Bool, 'LLVMIsUndef', [Value])
@@ -550,31 +587,35 @@ IsAConstantPointerNull = _library.function(Value, 'LLVMIsAConstantPointerNull', 
 IsAConstantStruct = _library.function(Value, 'LLVMIsAConstantStruct', [Value])
 IsAConstantVector = _library.function(Value, 'LLVMIsAConstantVector', [Value])
 IsAGlobalValue = _library.function(Value, 'LLVMIsAGlobalValue', [Value])
-if _version <= (3, 4):
-    IsAFunction = _library.function(Value, 'LLVMIsAFunction', [Value])
 IsAGlobalAlias = _library.function(Value, 'LLVMIsAGlobalAlias', [Value])
-if _version <= (3, 4):
-    IsAGlobalVariable = _library.function(Value, 'LLVMIsAGlobalVariable', [Value])
 if (3, 5) <= _version:
     IsAGlobalObject = _library.function(Value, 'LLVMIsAGlobalObject', [Value])
-    IsAFunction = _library.function(Value, 'LLVMIsAFunction', [Value])
-    IsAGlobalVariable = _library.function(Value, 'LLVMIsAGlobalVariable', [Value])
+IsAFunction = _library.function(Value, 'LLVMIsAFunction', [Value])
+IsAGlobalVariable = _library.function(Value, 'LLVMIsAGlobalVariable', [Value])
 IsAUndefValue = _library.function(Value, 'LLVMIsAUndefValue', [Value])
 IsAInstruction = _library.function(Value, 'LLVMIsAInstruction', [Value])
 IsABinaryOperator = _library.function(Value, 'LLVMIsABinaryOperator', [Value])
 IsACallInst = _library.function(Value, 'LLVMIsACallInst', [Value])
 IsAIntrinsicInst = _library.function(Value, 'LLVMIsAIntrinsicInst', [Value])
 IsADbgInfoIntrinsic = _library.function(Value, 'LLVMIsADbgInfoIntrinsic', [Value])
+IsADbgInfoIntrinsic = untested(IsADbgInfoIntrinsic)
 IsADbgDeclareInst = _library.function(Value, 'LLVMIsADbgDeclareInst', [Value])
+IsADbgDeclareInst = untested(IsADbgDeclareInst)
 if _version <= (3, 0) and False:
     # These are declared in the header, but linking finds no such symbol.
     IsAEHExceptionIntrinsic = _library.function(Value, 'LLVMIsAEHExceptionIntrinsic', [Value])
+    IsAEHExceptionIntrinsic = untested(IsAEHExceptionIntrinsic)
 if _version <= (3, 0) and False:
     IsAEHSelectorIntrinsic = _library.function(Value, 'LLVMIsAEHSelectorIntrinsic', [Value])
+    IsAEHSelectorIntrinsic = untested(IsAEHSelectorIntrinsic)
 IsAMemIntrinsic = _library.function(Value, 'LLVMIsAMemIntrinsic', [Value])
+IsAMemIntrinsic = untested(IsAMemIntrinsic)
 IsAMemCpyInst = _library.function(Value, 'LLVMIsAMemCpyInst', [Value])
+IsAMemCpyInst = untested(IsAMemCpyInst)
 IsAMemMoveInst = _library.function(Value, 'LLVMIsAMemMoveInst', [Value])
+IsAMemMoveInst = untested(IsAMemMoveInst)
 IsAMemSetInst = _library.function(Value, 'LLVMIsAMemSetInst', [Value])
+IsAMemSetInst = untested(IsAMemSetInst)
 IsACmpInst = _library.function(Value, 'LLVMIsACmpInst', [Value])
 IsAFCmpInst = _library.function(Value, 'LLVMIsAFCmpInst', [Value])
 IsAICmpInst = _library.function(Value, 'LLVMIsAICmpInst', [Value])
@@ -595,6 +636,7 @@ IsAReturnInst = _library.function(Value, 'LLVMIsAReturnInst', [Value])
 IsASwitchInst = _library.function(Value, 'LLVMIsASwitchInst', [Value])
 IsAUnreachableInst = _library.function(Value, 'LLVMIsAUnreachableInst', [Value])
 IsAResumeInst = _library.function(Value, 'LLVMIsAResumeInst', [Value])
+IsAResumeInst = untested(IsAResumeInst)
 IsAUnaryInstruction = _library.function(Value, 'LLVMIsAUnaryInstruction', [Value])
 IsAAllocaInst = _library.function(Value, 'LLVMIsAAllocaInst', [Value])
 IsACastInst = _library.function(Value, 'LLVMIsACastInst', [Value])
@@ -615,6 +657,7 @@ IsAZExtInst = _library.function(Value, 'LLVMIsAZExtInst', [Value])
 IsAExtractValueInst = _library.function(Value, 'LLVMIsAExtractValueInst', [Value])
 IsALoadInst = _library.function(Value, 'LLVMIsALoadInst', [Value])
 IsAVAArgInst = _library.function(Value, 'LLVMIsAVAArgInst', [Value])
+IsAVAArgInst = untested(IsAVAArgInst)
 
 
 GetFirstUse = _library.function(Use, 'LLVMGetFirstUse', [Value])
@@ -635,19 +678,25 @@ IsNull = _library.function(Bool, 'LLVMIsNull', [Value])
 ConstPointerNull = _library.function(Value, 'LLVMConstPointerNull', [Type])
 
 ConstInt = _library.function(Value, 'LLVMConstInt', [Type, ctypes.c_ulonglong, Bool])
+ConstInt = untested(ConstInt)
 ConstIntOfArbitraryPrecision = _library.function(Value, 'LLVMConstIntOfArbitraryPrecision', [Type, ctypes.c_uint, ctypes.POINTER(ctypes.c_uint64)])
+ConstIntOfArbitraryPrecision = untested(ConstIntOfArbitraryPrecision)
 ConstIntOfString = _library.function(Value, 'LLVMConstIntOfString', [Type, ctypes.c_char_p, ctypes.c_uint8])
+ConstIntOfString = untested(ConstIntOfString)
 ConstIntOfStringAndSize = _library.function(Value, 'LLVMConstIntOfStringAndSize', [Type, ctypes.c_char_p, ctypes.c_uint, ctypes.c_uint8])
 ConstReal = _library.function(Value, 'LLVMConstReal', [Type, ctypes.c_double])
 ConstRealOfString = _library.function(Value, 'LLVMConstRealOfString', [Type, ctypes.c_char_p])
+ConstRealOfString = untested(ConstRealOfString)
 ConstRealOfStringAndSize = _library.function(Value, 'LLVMConstRealOfStringAndSize', [Type, ctypes.c_char_p, ctypes.c_uint])
 ConstIntGetZExtValue = _library.function(ctypes.c_ulonglong, 'LLVMConstIntGetZExtValue', [Value])
 ConstIntGetSExtValue = _library.function(ctypes.c_longlong, 'LLVMConstIntGetSExtValue', [Value])
 
 ConstStringInContext = _library.function(Value, 'LLVMConstStringInContext', [Context, ctypes.c_char_p, ctypes.c_uint, Bool])
 ConstString = _library.function(Value, 'LLVMConstString', [ctypes.c_char_p, ctypes.c_uint, Bool])
+ConstString = untested(ConstString)
 ConstStructInContext = _library.function(Value, 'LLVMConstStructInContext', [Context, ctypes.POINTER(Value), ctypes.c_uint, Bool])
 ConstStruct = _library.function(Value, 'LLVMConstStruct', [ctypes.POINTER(Value), ctypes.c_uint, Bool])
+ConstStruct = untested(ConstStruct)
 ConstArray = _library.function(Value, 'LLVMConstArray', [Type, ctypes.POINTER(Value), ctypes.c_uint])
 ConstNamedStruct = _library.function(Value, 'LLVMConstNamedStruct', [Type, ctypes.POINTER(Value), ctypes.c_uint])
 ConstVector = _library.function(Value, 'LLVMConstVector', [ctypes.POINTER(Value), ctypes.c_uint])
@@ -704,11 +753,17 @@ ConstBitCast = _library.function(Value, 'LLVMConstBitCast', [Value, Type])
 if (3, 4) <= _version:
     ConstAddrSpaceCast = _library.function(Value, 'LLVMConstAddrSpaceCast', [Value, Type])
 ConstZExtOrBitCast = _library.function(Value, 'LLVMConstZExtOrBitCast', [Value, Type])
+ConstZExtOrBitCast = untested(ConstZExtOrBitCast)
 ConstSExtOrBitCast = _library.function(Value, 'LLVMConstSExtOrBitCast', [Value, Type])
+ConstSExtOrBitCast = untested(ConstSExtOrBitCast)
 ConstTruncOrBitCast = _library.function(Value, 'LLVMConstTruncOrBitCast', [Value, Type])
+ConstTruncOrBitCast = untested(ConstTruncOrBitCast)
 ConstPointerCast = _library.function(Value, 'LLVMConstPointerCast', [Value, Type])
+ConstPointerCast = untested(ConstPointerCast)
 ConstIntCast = _library.function(Value, 'LLVMConstIntCast', [Value, Type, Bool])
+ConstIntCast = untested(ConstIntCast)
 ConstFPCast = _library.function(Value, 'LLVMConstFPCast', [Value, Type])
+ConstFPCast = untested(ConstFPCast)
 ConstSelect = _library.function(Value, 'LLVMConstSelect', [Value, Value, Value])
 ConstExtractElement = _library.function(Value, 'LLVMConstExtractElement', [Value, Value])
 ConstInsertElement = _library.function(Value, 'LLVMConstInsertElement', [Value, Value, Value])
@@ -719,6 +774,7 @@ ConstInlineAsm = _library.function(Value, 'LLVMConstInlineAsm', [Type, ctypes.c_
 BlockAddress = _library.function(Value, 'LLVMBlockAddress', [Value, BasicBlock])
 
 GetGlobalParent = _library.function(Module, 'LLVMGetGlobalParent', [Value])
+GetGlobalParent = untested(GetGlobalParent)
 IsDeclaration = _library.function(Bool, 'LLVMIsDeclaration', [Value])
 GetLinkage = _library.function(Linkage, 'LLVMGetLinkage', [Value])
 SetLinkage = _library.function(None, 'LLVMSetLinkage', [Value, Linkage])
@@ -736,6 +792,7 @@ GetAlignment = _library.function(ctypes.c_uint, 'LLVMGetAlignment', [Value])
 SetAlignment = _library.function(None, 'LLVMSetAlignment', [Value, ctypes.c_uint])
 
 AddGlobal = _library.function(Value, 'LLVMAddGlobal', [Module, Type, ctypes.c_char_p])
+AddGlobal = untested(AddGlobal)
 AddGlobalInAddressSpace = _library.function(Value, 'LLVMAddGlobalInAddressSpace', [Module, Type,  ctypes.c_char_p, ctypes.c_uint])
 GetNamedGlobal = _library.function(Value, 'LLVMGetNamedGlobal', [Module, ctypes.c_char_p])
 GetFirstGlobal = _library.function(Value, 'LLVMGetFirstGlobal', [Module])
@@ -743,6 +800,7 @@ GetLastGlobal = _library.function(Value, 'LLVMGetLastGlobal', [Module])
 GetNextGlobal = _library.function(Value, 'LLVMGetNextGlobal', [Value])
 GetPreviousGlobal = _library.function(Value, 'LLVMGetPreviousGlobal', [Value])
 DeleteGlobal = _library.function(None, 'LLVMDeleteGlobal', [Value])
+DeleteGlobal = untested(DeleteGlobal)
 GetInitializer = _library.function(Value, 'LLVMGetInitializer', [Value])
 SetInitializer = _library.function(None, 'LLVMSetInitializer', [Value, Value])
 IsThreadLocal = _library.function(Bool, 'LLVMIsThreadLocal', [Value])
@@ -758,7 +816,9 @@ if (3, 3) <= _version:
 AddAlias = _library.function(Value, 'LLVMAddAlias', [Module, Type, Value, ctypes.c_char_p])
 
 DeleteFunction = _library.function(None, 'LLVMDeleteFunction', [Value])
+DeleteFunction = untested(DeleteFunction)
 GetIntrinsicID = _library.function(ctypes.c_uint, 'LLVMGetIntrinsicID', [Value])
+GetIntrinsicID = untested(GetIntrinsicID)
 GetFunctionCallConv = _library.function(CallConv, 'LLVMGetFunctionCallConv', [Value])
 SetFunctionCallConv = _library.function(None, 'LLVMSetFunctionCallConv', [Value, CallConv])
 GetGC = _library.function(ctypes.c_char_p, 'LLVMGetGC', [Value])
@@ -766,6 +826,7 @@ SetGC = _library.function(None, 'LLVMSetGC', [Value, ctypes.c_char_p])
 AddFunctionAttr = _library.function(None, 'LLVMAddFunctionAttr', [Value, Attribute])
 if (3, 3) <= _version:
     AddTargetDependentFunctionAttr = _library.function(None, 'LLVMAddTargetDependentFunctionAttr', [Value, ctypes.c_char_p, ctypes.c_char_p])
+    AddTargetDependentFunctionAttr = untested(AddTargetDependentFunctionAttr)
 GetFunctionAttr = _library.function(Attribute, 'LLVMGetFunctionAttr', [Value])
 RemoveFunctionAttr = _library.function(None, 'LLVMRemoveFunctionAttr', [Value, Attribute])
 
@@ -785,21 +846,26 @@ SetParamAlignment = _library.function(None, 'LLVMSetParamAlignment', [Value, cty
 
 MDStringInContext = _library.function(Value, 'LLVMMDStringInContext', [Context, _c.string_buffer, ctypes.c_uint])
 MDString = _library.function(Value, 'LLVMMDString', [_c.string_buffer, ctypes.c_uint])
+MDString = untested(MDString)
 MDNodeInContext = _library.function(Value, 'LLVMMDNodeInContext', [Context, ctypes.POINTER(Value), ctypes.c_uint])
 MDNode = _library.function(Value, 'LLVMMDNode', [ctypes.POINTER(Value), ctypes.c_uint])
+MDNode = untested(MDNode)
 GetMDString = _library.function(_c.string_buffer, 'LLVMGetMDString', [Value, ctypes.POINTER(ctypes.c_uint)])
 if _version <= (3, 0) and False:
     # These are declared in the header, but linking finds no such symbol.
     GetMDNodeNumOperands = _library.function(ctypes.c_int, 'LLVMGetMDNodeNumOperands', [Value])
-    GetMDNodeOperand = _library.function(Value, 'LLVMGetMDNodeOperand', [Value, ctypes.c_uint]);
+    GetMDNodeOperand = _library.function(Value, 'LLVMGetMDNodeOperand', [Value, ctypes.c_uint])
 if (3, 2) <= _version:
     # Actually present now. Slightly different signature.
     GetMDNodeNumOperands = _library.function(ctypes.c_uint, 'LLVMGetMDNodeNumOperands', [Value])
+    GetMDNodeNumOperands = untested(GetMDNodeNumOperands)
     GetMDNodeOperands = _library.function(None, 'LLVMGetMDNodeOperands', [Value, ctypes.POINTER(Value)])
+    GetMDNodeOperands = untested(GetMDNodeOperands)
 
 
 BasicBlockAsValue = _library.function(Value, 'LLVMBasicBlockAsValue', [BasicBlock])
 ValueIsBasicBlock = _library.function(Bool, 'LLVMValueIsBasicBlock', [Value])
+ValueIsBasicBlock = untested(ValueIsBasicBlock)
 ValueAsBasicBlock = _library.function(BasicBlock, 'LLVMValueAsBasicBlock', [Value])
 GetBasicBlockParent = _library.function(Value, 'LLVMGetBasicBlockParent', [BasicBlock])
 GetBasicBlockTerminator = _library.function(Value, 'LLVMGetBasicBlockTerminator', [BasicBlock])
@@ -812,32 +878,47 @@ GetPreviousBasicBlock = _library.function(BasicBlock, 'LLVMGetPreviousBasicBlock
 GetEntryBasicBlock = _library.function(BasicBlock, 'LLVMGetEntryBasicBlock', [Value])
 AppendBasicBlockInContext = _library.function(BasicBlock, 'LLVMAppendBasicBlockInContext', [Context, Value, ctypes.c_char_p])
 AppendBasicBlock = _library.function(BasicBlock, 'LLVMAppendBasicBlock', [Value, ctypes.c_char_p])
+AppendBasicBlock = untested(AppendBasicBlock)
 InsertBasicBlockInContext = _library.function(BasicBlock, 'LLVMInsertBasicBlockInContext', [Context, BasicBlock, ctypes.c_char_p])
 InsertBasicBlock = _library.function(BasicBlock, 'LLVMInsertBasicBlock', [BasicBlock, ctypes.c_char_p])
+InsertBasicBlock = untested(InsertBasicBlock)
 DeleteBasicBlock = _library.function(None, 'LLVMDeleteBasicBlock', [BasicBlock])
+DeleteBasicBlock = untested(DeleteBasicBlock)
 RemoveBasicBlockFromParent = _library.function(None, 'LLVMRemoveBasicBlockFromParent', [BasicBlock])
+RemoveBasicBlockFromParent = untested(RemoveBasicBlockFromParent)
 MoveBasicBlockBefore = _library.function(None, 'LLVMMoveBasicBlockBefore', [BasicBlock, BasicBlock])
 MoveBasicBlockAfter = _library.function(None, 'LLVMMoveBasicBlockAfter', [BasicBlock, BasicBlock])
 GetFirstInstruction = _library.function(Value, 'LLVMGetFirstInstruction', [BasicBlock])
 GetLastInstruction = _library.function(Value, 'LLVMGetLastInstruction', [BasicBlock])
 
 HasMetadata = _library.function(ctypes.c_int, 'LLVMHasMetadata', [Value])
+HasMetadata = untested(HasMetadata)
 GetMetadata = _library.function(Value, 'LLVMGetMetadata', [Value, ctypes.c_uint])
+GetMetadata = untested(GetMetadata)
 SetMetadata = _library.function(None, 'LLVMSetMetadata', [Value, ctypes.c_uint, Value])
+SetMetadata = untested(SetMetadata)
 GetInstructionParent = _library.function(BasicBlock, 'LLVMGetInstructionParent', [Value])
 GetNextInstruction = _library.function(Value, 'LLVMGetNextInstruction', [Value])
 GetPreviousInstruction = _library.function(Value, 'LLVMGetPreviousInstruction', [Value])
 InstructionEraseFromParent = _library.function(None, 'LLVMInstructionEraseFromParent', [Value])
+InstructionEraseFromParent = untested(InstructionEraseFromParent)
 GetInstructionOpcode = _library.function(Opcode, 'LLVMGetInstructionOpcode', [Value])
 GetICmpPredicate = _library.function(IntPredicate, 'LLVMGetICmpPredicate', [Value])
 
 SetInstructionCallConv = _library.function(None, 'LLVMSetInstructionCallConv', [Value, ctypes.c_uint])
+SetInstructionCallConv = untested(SetInstructionCallConv)
 GetInstructionCallConv = _library.function(ctypes.c_uint, 'LLVMGetInstructionCallConv', [Value])
+GetInstructionCallConv = untested(GetInstructionCallConv)
 AddInstrAttribute = _library.function(None, 'LLVMAddInstrAttribute', [Value, ctypes.c_uint, Attribute])
+AddInstrAttribute = untested(AddInstrAttribute)
 RemoveInstrAttribute = _library.function(None, 'LLVMRemoveInstrAttribute', [Value, ctypes.c_uint,  Attribute])
+RemoveInstrAttribute = untested(RemoveInstrAttribute)
 SetInstrParamAlignment = _library.function(None, 'LLVMSetInstrParamAlignment', [Value, ctypes.c_uint, ctypes.c_uint])
+SetInstrParamAlignment = untested(SetInstrParamAlignment)
 IsTailCall = _library.function(Bool, 'LLVMIsTailCall', [Value])
+IsTailCall = untested(IsTailCall)
 SetTailCall = _library.function(None, 'LLVMSetTailCall', [Value, Bool])
+SetTailCall = untested(SetTailCall)
 
 GetSwitchDefaultDest = _library.function(BasicBlock, 'LLVMGetSwitchDefaultDest', [Value])
 
@@ -849,18 +930,26 @@ GetIncomingBlock = _library.function(BasicBlock, 'LLVMGetIncomingBlock', [Value,
 
 CreateBuilderInContext = _library.function(Builder, 'LLVMCreateBuilderInContext', [Context])
 CreateBuilder = _library.function(Builder, 'LLVMCreateBuilder', [])
+CreateBuilder = untested(CreateBuilder)
 PositionBuilder = _library.function(None, 'LLVMPositionBuilder', [Builder, BasicBlock, Value])
+PositionBuilder = untested(PositionBuilder)
 PositionBuilderBefore = _library.function(None, 'LLVMPositionBuilderBefore', [Builder, Value])
+PositionBuilderBefore = untested(PositionBuilderBefore)
 PositionBuilderAtEnd = _library.function(None, 'LLVMPositionBuilderAtEnd', [Builder, BasicBlock])
 GetInsertBlock = _library.function(BasicBlock, 'LLVMGetInsertBlock', [Builder])
 ClearInsertionPosition = _library.function(None, 'LLVMClearInsertionPosition', [Builder])
 InsertIntoBuilder = _library.function(None, 'LLVMInsertIntoBuilder', [Builder, Value])
+InsertIntoBuilder = untested(InsertIntoBuilder)
 InsertIntoBuilderWithName = _library.function(None, 'LLVMInsertIntoBuilderWithName', [Builder, Value, ctypes.c_char_p])
+InsertIntoBuilderWithName = untested(InsertIntoBuilderWithName)
 DisposeBuilder = _library.function(None, 'LLVMDisposeBuilder', [Builder])
 
 SetCurrentDebugLocation = _library.function(None, 'LLVMSetCurrentDebugLocation', [Builder, Value])
+SetCurrentDebugLocation = untested(SetCurrentDebugLocation)
 GetCurrentDebugLocation = _library.function(Value, 'LLVMGetCurrentDebugLocation', [Builder])
+GetCurrentDebugLocation = untested(GetCurrentDebugLocation)
 SetInstDebugLocation = _library.function(None, 'LLVMSetInstDebugLocation', [Builder, Value])
+SetInstDebugLocation = untested(SetInstDebugLocation)
 
 BuildRetVoid = _library.function(Value, 'LLVMBuildRetVoid', [Builder])
 BuildRet = _library.function(Value, 'LLVMBuildRet', [Builder, Value])
@@ -870,13 +959,18 @@ BuildCondBr = _library.function(Value, 'LLVMBuildCondBr', [Builder, Value, Basic
 BuildSwitch = _library.function(Value, 'LLVMBuildSwitch', [Builder, Value, BasicBlock, ctypes.c_uint])
 BuildIndirectBr = _library.function(Value, 'LLVMBuildIndirectBr', [Builder, Value, ctypes.c_uint])
 BuildInvoke = _library.function(Value, 'LLVMBuildInvoke', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, BasicBlock, BasicBlock, ctypes.c_char_p])
+BuildInvoke = untested(BuildInvoke)
 BuildLandingPad = _library.function(Value, 'LLVMBuildLandingPad', [Builder, Type, Value, ctypes.c_uint, ctypes.c_char_p])
+BuildLandingPad = untested(BuildLandingPad)
 BuildResume = _library.function(Value, 'LLVMBuildResume', [Builder, Value])
+BuildResume = untested(BuildResume)
 BuildUnreachable = _library.function(Value, 'LLVMBuildUnreachable', [Builder])
 AddCase = _library.function(None, 'LLVMAddCase', [Value, Value, BasicBlock])
 AddDestination = _library.function(None, 'LLVMAddDestination', [Value, BasicBlock])
 AddClause = _library.function(None, 'LLVMAddClause', [Value, Value])
+AddClause = untested(AddClause)
 SetCleanup = _library.function(None, 'LLVMSetCleanup', [Value, Bool])
+SetCleanup = untested(SetCleanup)
 
 BuildAdd = _library.function(Value, 'LLVMBuildAdd', [Builder, Value, Value, ctypes.c_char_p])
 BuildNSWAdd = _library.function(Value, 'LLVMBuildNSWAdd', [Builder, Value, Value, ctypes.c_char_p])
@@ -904,6 +998,7 @@ BuildAnd = _library.function(Value, 'LLVMBuildAnd', [Builder, Value, Value, ctyp
 BuildOr = _library.function(Value, 'LLVMBuildOr', [Builder, Value, Value, ctypes.c_char_p])
 BuildXor = _library.function(Value, 'LLVMBuildXor', [Builder, Value, Value, ctypes.c_char_p])
 BuildBinOp = _library.function(Value, 'LLVMBuildBinOp', [Builder, Opcode, Value, Value, ctypes.c_char_p])
+BuildBinOp = untested(BuildBinOp)
 BuildNeg = _library.function(Value, 'LLVMBuildNeg', [Builder, Value, ctypes.c_char_p])
 BuildNSWNeg = _library.function(Value, 'LLVMBuildNSWNeg', [Builder, Value, ctypes.c_char_p])
 BuildNUWNeg = _library.function(Value, 'LLVMBuildNUWNeg', [Builder, Value, ctypes.c_char_p])
@@ -911,15 +1006,19 @@ BuildFNeg = _library.function(Value, 'LLVMBuildFNeg', [Builder, Value, ctypes.c_
 BuildNot = _library.function(Value, 'LLVMBuildNot', [Builder, Value, ctypes.c_char_p])
 
 BuildMalloc = _library.function(Value, 'LLVMBuildMalloc', [Builder, Type, ctypes.c_char_p])
+BuildMalloc = untested(BuildMalloc)
 BuildArrayMalloc = _library.function(Value, 'LLVMBuildArrayMalloc', [Builder, Type, Value, ctypes.c_char_p])
+BuildArrayMalloc = untested(BuildArrayMalloc)
 BuildAlloca = _library.function(Value, 'LLVMBuildAlloca', [Builder, Type, ctypes.c_char_p])
 BuildArrayAlloca = _library.function(Value, 'LLVMBuildArrayAlloca', [Builder, Type, Value, ctypes.c_char_p])
 BuildFree = _library.function(Value, 'LLVMBuildFree', [Builder, Value])
+BuildFree = untested(BuildFree)
 BuildLoad = _library.function(Value, 'LLVMBuildLoad', [Builder, Value, ctypes.c_char_p])
 BuildStore = _library.function(Value, 'LLVMBuildStore', [Builder, Value, Value])
 BuildGEP = _library.function(Value, 'LLVMBuildGEP', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, ctypes.c_char_p])
 BuildInBoundsGEP = _library.function(Value, 'LLVMBuildInBoundsGEP', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, ctypes.c_char_p])
 BuildStructGEP = _library.function(Value, 'LLVMBuildStructGEP', [Builder, Value, ctypes.c_uint, ctypes.c_char_p])
+BuildStructGEP = untested(BuildStructGEP)
 BuildGlobalString = _library.function(Value, 'LLVMBuildGlobalString', [Builder, ctypes.c_char_p, ctypes.c_char_p])
 BuildGlobalStringPtr = _library.function(Value, 'LLVMBuildGlobalStringPtr', [Builder, ctypes.c_char_p, ctypes.c_char_p])
 if (3, 1) <= _version:
@@ -941,12 +1040,19 @@ BuildBitCast = _library.function(Value, 'LLVMBuildBitCast', [Builder, Value, Typ
 if (3, 4) <= _version:
     BuildAddrSpaceCast = _library.function(Value, 'LLVMBuildAddrSpaceCast', [Builder, Value, Type, ctypes.c_char_p])
 BuildZExtOrBitCast = _library.function(Value, 'LLVMBuildZExtOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
+BuildZExtOrBitCast = untested(BuildZExtOrBitCast)
 BuildSExtOrBitCast = _library.function(Value, 'LLVMBuildSExtOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
+BuildSExtOrBitCast = untested(BuildSExtOrBitCast)
 BuildTruncOrBitCast = _library.function(Value, 'LLVMBuildTruncOrBitCast', [Builder, Value, Type, ctypes.c_char_p])
+BuildTruncOrBitCast = untested(BuildTruncOrBitCast)
 BuildCast = _library.function(Value, 'LLVMBuildCast', [Builder, Opcode, Value, Type, ctypes.c_char_p])
+BuildCast = untested(BuildCast)
 BuildPointerCast = _library.function(Value, 'LLVMBuildPointerCast', [Builder, Value, Type, ctypes.c_char_p])
+BuildPointerCast = untested(BuildPointerCast)
 BuildIntCast = _library.function(Value, 'LLVMBuildIntCast', [Builder, Value, Type, ctypes.c_char_p])
+BuildIntCast = untested(BuildIntCast)
 BuildFPCast = _library.function(Value, 'LLVMBuildFPCast', [Builder, Value, Type, ctypes.c_char_p])
+BuildFPCast = untested(BuildFPCast)
 
 BuildICmp = _library.function(Value, 'LLVMBuildICmp', [Builder, IntPredicate, Value, Value, ctypes.c_char_p])
 BuildFCmp = _library.function(Value, 'LLVMBuildFCmp', [Builder, RealPredicate, Value, Value, ctypes.c_char_p])
@@ -955,6 +1061,7 @@ BuildPhi = _library.function(Value, 'LLVMBuildPhi', [Builder, Type, ctypes.c_cha
 BuildCall = _library.function(Value, 'LLVMBuildCall', [Builder, Value, ctypes.POINTER(Value), ctypes.c_uint, ctypes.c_char_p])
 BuildSelect = _library.function(Value, 'LLVMBuildSelect', [Builder, Value, Value, Value, ctypes.c_char_p])
 BuildVAArg = _library.function(Value, 'LLVMBuildVAArg', [Builder, Value, Type, ctypes.c_char_p])
+BuildVAArg = untested(BuildVAArg)
 BuildExtractElement = _library.function(Value, 'LLVMBuildExtractElement', [Builder, Value, Value, ctypes.c_char_p])
 BuildInsertElement = _library.function(Value, 'LLVMBuildInsertElement', [Builder, Value, Value, Value, ctypes.c_char_p])
 BuildShuffleVector = _library.function(Value, 'LLVMBuildShuffleVector', [Builder, Value, Value, Value, ctypes.c_char_p])
@@ -971,33 +1078,48 @@ if (3, 3) <= _version:
 
 
 CreateModuleProviderForExistingModule = _library.function(ModuleProvider, 'LLVMCreateModuleProviderForExistingModule', [Module])
+CreateModuleProviderForExistingModule = untested(CreateModuleProviderForExistingModule)
 DisposeModuleProvider = _library.function(None, 'LLVMDisposeModuleProvider', [ModuleProvider])
+DisposeModuleProvider = untested(DisposeModuleProvider)
 
 
 CreateMemoryBufferWithContentsOfFile = _library.function(Bool, 'LLVMCreateMemoryBufferWithContentsOfFile', [ctypes.c_char_p, ctypes.POINTER(MemoryBuffer), ctypes.POINTER(_c.string_buffer)])
 CreateMemoryBufferWithSTDIN = _library.function(Bool, 'LLVMCreateMemoryBufferWithSTDIN', [ctypes.POINTER(MemoryBuffer), ctypes.POINTER(_c.string_buffer)])
+CreateMemoryBufferWithSTDIN = untested(CreateMemoryBufferWithSTDIN)
 if (3, 3) <= _version:
-    CreateMemoryBufferWithMemoryRange = _library.function(MemoryBuffer, 'LLVMCreateMemoryBufferWithMemoryRange', [_c.string_buffer, ctypes.c_size_t, ctypes.c_char_p, Bool]);
-    CreateMemoryBufferWithMemoryRangeCopy = _library.function(MemoryBuffer, 'LLVMCreateMemoryBufferWithMemoryRangeCopy', [_c.string_buffer, ctypes.c_size_t, ctypes.c_char_p]);
-    GetBufferStart = _library.function(_c.string_buffer, 'LLVMGetBufferStart', [MemoryBuffer]);
-    GetBufferSize = _library.function(ctypes.c_size_t, 'LLVMGetBufferSize', [MemoryBuffer]);
+    CreateMemoryBufferWithMemoryRange = _library.function(MemoryBuffer, 'LLVMCreateMemoryBufferWithMemoryRange', [_c.string_buffer, ctypes.c_size_t, ctypes.c_char_p, Bool])
+    CreateMemoryBufferWithMemoryRangeCopy = _library.function(MemoryBuffer, 'LLVMCreateMemoryBufferWithMemoryRangeCopy', [_c.string_buffer, ctypes.c_size_t, ctypes.c_char_p])
+    GetBufferStart = _library.function(_c.string_buffer, 'LLVMGetBufferStart', [MemoryBuffer])
+    GetBufferSize = _library.function(ctypes.c_size_t, 'LLVMGetBufferSize', [MemoryBuffer])
 DisposeMemoryBuffer = _library.function(None, 'LLVMDisposeMemoryBuffer', [MemoryBuffer])
 
 
 if (3, 3) <= _version:
-    _library.function(Bool, 'LLVMStartMultithreaded', []) # Deprecated in 3.5
-    _library.function(None, 'LLVMStopMultithreaded', []) # Deprecated in 3.5
+    StartMultiThreaded = _library.function(Bool, 'LLVMStartMultithreaded', []) # Deprecated in 3.5
+    StartMultiThreaded = untested(StartMultiThreaded)
+    StopMultiThreaded = _library.function(None, 'LLVMStopMultithreaded', []) # Deprecated in 3.5
+    StopMultiThreaded = untested(StopMultiThreaded)
     # Instead there is a compile-time argument to determine this.
-    _library.function(Bool, 'LLVMIsMultithreaded', [])
+    IsMultiThreaded = _library.function(Bool, 'LLVMIsMultithreaded', [])
+    IsMultiThreaded = untested(IsMultiThreaded)
 
 
 GetGlobalPassRegistry = _library.function(PassRegistry, 'LLVMGetGlobalPassRegistry', [])
+GetGlobalPassRegistry = untested(GetGlobalPassRegistry)
 
 CreatePassManager = _library.function(PassManager, 'LLVMCreatePassManager', [])
+CreatePassManager = untested(CreatePassManager)
 CreateFunctionPassManagerForModule = _library.function(PassManager, 'LLVMCreateFunctionPassManagerForModule', [Module])
+CreateFunctionPassManagerForModule = untested(CreateFunctionPassManagerForModule)
 CreateFunctionPassManager = _library.function(PassManager, 'LLVMCreateFunctionPassManager', [ModuleProvider])
+CreateFunctionPassManager = untested(CreateFunctionPassManager)
 RunPassManager = _library.function(Bool, 'LLVMRunPassManager', [PassManager, Module])
+RunPassManager = untested(RunPassManager)
 InitializeFunctionPassManager = _library.function(Bool, 'LLVMInitializeFunctionPassManager', [PassManager])
+InitializeFunctionPassManager = untested(InitializeFunctionPassManager)
 RunFunctionPassManager = _library.function(Bool, 'LLVMRunFunctionPassManager', [PassManager, Value])
+RunFunctionPassManager = untested(RunFunctionPassManager)
 FinalizeFunctionPassManager = _library.function(Bool, 'LLVMFinalizeFunctionPassManager', [PassManager])
+FinalizeFunctionPassManager = untested(FinalizeFunctionPassManager)
 DisposePassManager = _library.function(None, 'LLVMDisposePassManager', [PassManager])
+DisposePassManager = untested(DisposePassManager)

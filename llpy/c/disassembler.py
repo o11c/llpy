@@ -25,6 +25,8 @@ from . import _c
 
 from .core import _library, _version
 
+from ..utils import cuntested as untested
+
 
 DisasmContext = _c.opaque('DisasmContext')
 
@@ -94,9 +96,14 @@ if (3, 4) <= _version:
     Option_PrintLatency = 16
 
 CreateDisasm = _library.function(DisasmContext, 'LLVMCreateDisasm', [ctypes.c_char_p, ctypes.c_void_p, ctypes.c_int, OpInfoCallback, SymbolLookupCallback])
+CreateDisasm = untested(CreateDisasm)
 if (3, 3) <= _version:
     CreateDisasmCPU = _library.function(DisasmContext, 'LLVMCreateDisasmCPU', [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_int, OpInfoCallback, SymbolLookupCallback])
+    CreateDisasmCPU = untested(CreateDisasmCPU)
 if (3, 2) <= _version:
     SetDisasmOptions = _library.function(ctypes.c_int, 'LLVMSetDisasmOptions', [DisasmContext, ctypes.c_uint64])
+    SetDisasmOptions = untested(SetDisasmOptions)
 DisasmDispose = _library.function(None, 'LLVMDisasmDispose', [DisasmContext])
+DisasmDispose = untested(DisasmDispose)
 DisasmInstruction = _library.function(ctypes.c_size_t, 'LLVMDisasmInstruction', [DisasmContext, ctypes.POINTER(ctypes.c_uint8), ctypes.c_uint64, ctypes.c_uint64, ctypes.POINTER(ctypes.c_char), ctypes.c_size_t])
+DisasmInstruction = untested(DisasmInstruction)

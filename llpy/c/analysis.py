@@ -28,6 +28,8 @@ from .core import Bool
 from .core import Module
 from .core import Value
 
+from ..utils import cuntested as untested
+
 
 verifier_failure_actions = [
     'AbortProcess',
@@ -43,4 +45,6 @@ VerifyModule = _library.function(Bool, 'LLVMVerifyModule', [Module, VerifierFail
 VerifyFunction = _library.function(Bool, 'LLVMVerifyFunction', [Value, VerifierFailureAction])
 
 ViewFunctionCFG = _library.function(None, 'LLVMViewFunctionCFG', [Value])
+ViewFunctionCFG = untested(ViewFunctionCFG)
 ViewFunctionCFGOnly = _library.function(None, 'LLVMViewFunctionCFGOnly', [Value])
+ViewFunctionCFGOnly = untested(ViewFunctionCFGOnly)

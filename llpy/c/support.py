@@ -28,6 +28,9 @@ from ._c2 import _library, _version
 if _version <= (3, 4):
     from .core import Bool
 
+from ..utils import cuntested as untested
+
+
 if (3, 5) <= _version:
     Bool = ctypes.c_int
     MemoryBuffer = _c.opaque('MemoryBuffer')

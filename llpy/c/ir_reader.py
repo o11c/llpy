@@ -28,6 +28,9 @@ from .core import Context
 from .core import Module
 from .core import MemoryBuffer
 
+from ..utils import cuntested as untested
+
 
 if (3, 4) <= _version:
     ParseIRInContext = _library.function(Bool, 'LLVMParseIRInContext', [Context, MemoryBuffer, ctypes.POINTER(Module), ctypes.POINTER(_c.string_buffer)])
+    ParseIRInContext = untested(ParseIRInContext)

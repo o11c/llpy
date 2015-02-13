@@ -24,9 +24,12 @@ import ctypes
 from .core import _library
 from .core import Module
 
+from ..utils import cuntested as untested
+
 
 WriteBitcodeToFile = _library.function(ctypes.c_int, 'LLVMWriteBitcodeToFile', [Module, ctypes.c_char_p])
 WriteBitcodeToFD = _library.function(ctypes.c_int, 'LLVMWriteBitcodeToFD', [Module, ctypes.c_int, ctypes.c_int, ctypes.c_int])
 
 # deprecated
 WriteBitcodeToFileHandle = _library.function(ctypes.c_int, 'LLVMWriteBitcodeToFileHandle', [Module, ctypes.c_int])
+WriteBitcodeToFileHandle = untested(WriteBitcodeToFileHandle)

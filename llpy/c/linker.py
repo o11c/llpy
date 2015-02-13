@@ -27,6 +27,8 @@ from .core import _library, _version
 from .core import Bool
 from .core import Module
 
+from ..utils import cuntested as untested
+
 
 if (3, 2) <= _version:
     LinkerMode = _c.enum('LinkerMode',
@@ -37,3 +39,4 @@ if (3, 2) <= _version:
 
 if (3, 2) <= _version:
     LinkModules = _library.function(Bool, 'LLVMLinkModules', [Module, Module, LinkerMode, ctypes.POINTER(_c.string_buffer)])
+    LinkModules = untested(LinkModules)

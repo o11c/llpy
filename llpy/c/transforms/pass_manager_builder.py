@@ -27,6 +27,8 @@ from ..core import _library, _version
 from ..core import Bool
 from ..core import PassManager
 
+from ...utils import cuntested as untested
+
 
 PassManagerBuilder = _c.opaque('PassManagerBuilder')
 if _version <= (3, 2):
@@ -35,13 +37,24 @@ if (3, 3) <= _version:
     bool = Bool
 
 PassManagerBuilderCreate = _library.function(PassManagerBuilder, 'LLVMPassManagerBuilderCreate', [])
+PassManagerBuilderCreate = untested(PassManagerBuilderCreate)
 PassManagerBuilderDispose = _library.function(None, 'LLVMPassManagerBuilderDispose', [PassManagerBuilder])
+PassManagerBuilderDispose = untested(PassManagerBuilderDispose)
 PassManagerBuilderSetOptLevel = _library.function(None, 'LLVMPassManagerBuilderSetOptLevel', [PassManagerBuilder, ctypes.c_uint])
+PassManagerBuilderSetOptLevel = untested(PassManagerBuilderSetOptLevel)
 PassManagerBuilderSetSizeLevel = _library.function(None, 'LLVMPassManagerBuilderSetSizeLevel', [PassManagerBuilder, ctypes.c_uint])
+PassManagerBuilderSetSizeLevel = untested(PassManagerBuilderSetSizeLevel)
 PassManagerBuilderSetDisableUnitAtATime = _library.function(None, 'LLVMPassManagerBuilderSetDisableUnitAtATime', [PassManagerBuilder, Bool])
+PassManagerBuilderSetDisableUnitAtATime = untested(PassManagerBuilderSetDisableUnitAtATime)
 PassManagerBuilderSetDisableUnrollLoops = _library.function(None, 'LLVMPassManagerBuilderSetDisableUnrollLoops', [PassManagerBuilder, Bool])
+PassManagerBuilderSetDisableUnrollLoops = untested(PassManagerBuilderSetDisableUnrollLoops)
 PassManagerBuilderSetDisableSimplifyLibCalls = _library.function(None, 'LLVMPassManagerBuilderSetDisableSimplifyLibCalls', [PassManagerBuilder, Bool])
+PassManagerBuilderSetDisableSimplifyLibCalls = untested(PassManagerBuilderSetDisableSimplifyLibCalls)
 PassManagerBuilderUseInlinerWithThreshold = _library.function(None, 'LLVMPassManagerBuilderUseInlinerWithThreshold', [PassManagerBuilder, ctypes.c_uint])
+PassManagerBuilderUseInlinerWithThreshold = untested(PassManagerBuilderUseInlinerWithThreshold)
 PassManagerBuilderPopulateFunctionPassManager = _library.function(None, 'LLVMPassManagerBuilderPopulateFunctionPassManager', [PassManagerBuilder, PassManager])
+PassManagerBuilderPopulateFunctionPassManager = untested(PassManagerBuilderPopulateFunctionPassManager)
 PassManagerBuilderPopulateModulePassManager = _library.function(None, 'LLVMPassManagerBuilderPopulateModulePassManager', [PassManagerBuilder, PassManager])
+PassManagerBuilderPopulateModulePassManager = untested(PassManagerBuilderPopulateModulePassManager)
 PassManagerBuilderPopulateLTOPassManager = _library.function(None, 'LLVMPassManagerBuilderPopulateLTOPassManager', [PassManagerBuilder, PassManager, bool, bool])
+PassManagerBuilderPopulateLTOPassManager = untested(PassManagerBuilderPopulateLTOPassManager)

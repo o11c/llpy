@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from functools import reduce
 import gc
+from itertools import product
 import operator
 import os
 import unittest
@@ -30,19 +31,26 @@ class ReplaceOutFD(object):
 
 class DumpTestCase(unittest.TestCase):
 
-    def assertDump(self, obj, str):
+    def assertDump(self, obj, s):
         if _version <= (3, 1):
             if isinstance(obj, llpy.core.GlobalVariable):
-                str += '\n'
+                s += '\n'
         with ReplaceOutFD(2) as f:
             obj.Dump()
         with f:
-            assert f.read() == str
+            assert f.read() == s
+        if (3, 4) <= _version:
+            if isinstance(obj, llpy.core.Value):
+                assert obj.PrintToString() + '\n' == s
 
 class TestContext(DumpTestCase):
 
     def setUp(self):
         self.ctx = llpy.core.Context()
+
+    def tearDown(self):
+        del self.ctx
+        gc.collect()
 
     def test_context(self):
         pass
@@ -122,15 +130,16 @@ r'''<{ [4 x i8], [4 x i8] }> <{ [4 x i8] c"foo\00", [4 x i8] c"bar\00" }>
 
 ''')
 
-    def tearDown(self):
-        del self.ctx
-        gc.collect()
-
 class TestModule(DumpTestCase):
 
     def setUp(self):
         self.ctx = llpy.core.Context()
         self.mod = llpy.core.Module(self.ctx, 'TestModule')
+
+    def tearDown(self):
+        del self.mod
+        del self.ctx
+        gc.collect()
 
     def test_module(self):
         assert self.mod.GetContext() is self.ctx
@@ -273,15 +282,21 @@ declare void @foo()
         with self.assertRaises(OSError):
             self.mod.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
 
-    def tearDown(self):
-        del self.mod
-        del self.ctx
-        gc.collect()
-
 class TestType(DumpTestCase):
 
     def setUp(self):
         self.ctx = llpy.core.Context()
+
+    def tearDown(self):
+        del self.ctx
+        gc.collect()
+
+    def ty_str(self, ty):
+        s = str(ty)
+        if (3, 4) <= _version:
+            assert s == ty.PrintToString()
+            self.assertDump(ty, s)
+        return s
 
     def test_int(self):
         # also tests general type stuff
@@ -289,13 +304,13 @@ class TestType(DumpTestCase):
         ctx = self.ctx
         # integers of size 1,8,16,32,64 are handled differently internally
         i2 = llpy.core.IntegerType(ctx, 2)
-        assert str(i2) == 'i2'
+        assert self.ty_str(i2) == 'i2'
         assert i2 is llpy.core.IntegerType(ctx, 2)
         assert isinstance(i2, llpy.core.IntegerType)
         assert 2 == i2.GetIntTypeWidth()
         assert i2.GetTypeContext() is ctx
         i64 = llpy.core.IntegerType(ctx, 64)
-        assert str(i64) == 'i64'
+        assert self.ty_str(i64) == 'i64'
         assert i64 is llpy.core.IntegerType(ctx, 64)
         assert isinstance(i2, llpy.core.IntegerType)
         assert 64 == i64.GetIntTypeWidth()
@@ -451,7 +466,7 @@ class TestType(DumpTestCase):
 
     def do_test_real(self, tyc, name, values):
         real_type = tyc(self.ctx)
-        assert str(real_type) == name
+        assert self.ty_str(real_type) == name
         assert real_type.IsSized()
         assert real_type.GetTypeContext() is self.ctx
 
@@ -483,8 +498,8 @@ class TestType(DumpTestCase):
         i8pp = llpy.core.PointerType(i8p)
         main_type = llpy.core.FunctionType(i32, [i32, i8pp])
         printf_type = llpy.core.FunctionType(i32, [i8p], True)
-        assert str(main_type) == 'i32(i32, i8**)'
-        assert str(printf_type) == 'i32(i8*, ...)'
+        assert self.ty_str(main_type) == 'i32 (i32, i8**)'
+        assert self.ty_str(printf_type) == 'i32 (i8*, ...)'
         assert not main_type.IsSized()
         assert not printf_type.IsSized()
         assert main_type.GetTypeContext() is self.ctx
@@ -502,22 +517,34 @@ class TestType(DumpTestCase):
         # named struct types never coalesce; anonymous ones do
         st_noa = llpy.core.StructType(self.ctx, None, 'OLoose')
         assert str(st_noa) == 'struct OLoose'
+        if (3, 4) <= _version:
+            assert st_noa.PrintToString() == '%OLoose = type opaque'
         assert st_noa is not llpy.core.StructType(self.ctx, None, 'OLoose')
         st_nop = llpy.core.StructType(self.ctx, None, 'OPacked')
         assert str(st_nop) == 'struct OPacked'
+        if (3, 4) <= _version:
+            assert st_nop.PrintToString() == '%OPacked = type opaque'
         assert st_nop is not llpy.core.StructType(self.ctx, None, 'OPacked')
         st_nca = llpy.core.StructType(self.ctx, [i64], 'Loose', False)
         assert str(st_nca) == 'struct Loose { i64 }'
+        if (3, 4) <= _version:
+            assert st_nca.PrintToString() == '%Loose = type { i64 }'
         assert st_nca is not llpy.core.StructType(self.ctx, [i64], 'Loose', False)
         st_ncp = llpy.core.StructType(self.ctx, [i64], 'Packed', True)
         assert str(st_ncp) == 'struct Packed <{ i64 }>'
+        if (3, 4) <= _version:
+            assert st_ncp.PrintToString() == '%Packed = type <{ i64 }>'
         assert st_ncp is not llpy.core.StructType(self.ctx, [i64], 'Packed', True)
 
         st_aca = llpy.core.StructType(self.ctx, [i64], None, False)
         assert str(st_aca) == 'struct { i64 }'
+        if (3, 4) <= _version:
+            assert st_aca.PrintToString() == '{ i64 }'
         assert st_aca is llpy.core.StructType(self.ctx, [i64], None, False)
         st_acp = llpy.core.StructType(self.ctx, [i64], None, True)
         assert str(st_acp) == 'struct <{ i64 }>'
+        if (3, 4) <= _version:
+            assert st_acp.PrintToString() == '<{ i64 }>'
         assert st_acp is llpy.core.StructType(self.ctx, [i64], None, True)
 
         assert 6 == len({id(t) for t in [st_noa, st_nop, st_nca, st_ncp, st_aca, st_acp]})
@@ -624,7 +651,7 @@ class TestType(DumpTestCase):
     def test_array(self):
         i64 = llpy.core.IntegerType(self.ctx, 64)
         arr = llpy.core.ArrayType(i64, 2)
-        assert str(arr) == '[2 x i64]'
+        assert self.ty_str(arr) == '[2 x i64]'
         assert i64 is arr.GetElementType()
         assert 2 == arr.GetArrayLength()
         assert arr.IsSized()
@@ -639,8 +666,8 @@ class TestType(DumpTestCase):
         i64 = llpy.core.IntegerType(self.ctx, 64)
         pa0 = llpy.core.PointerType(i64)
         pa1 = llpy.core.PointerType(i64, 1)
-        assert str(pa0) == 'i64*'
-        assert str(pa1) == 'i64 addrspace(1)*'
+        assert self.ty_str(pa0) == 'i64*'
+        assert self.ty_str(pa1) == 'i64 addrspace(1)*'
         assert pa0.IsSized()
         assert pa1.IsSized()
         assert pa0.GetTypeContext() is self.ctx
@@ -663,7 +690,7 @@ class TestType(DumpTestCase):
     def test_vector(self):
         i64 = llpy.core.IntegerType(self.ctx, 64)
         v2t = llpy.core.VectorType(i64, 2)
-        assert str(v2t) == '<2 x i64>'
+        assert self.ty_str(v2t) == '<2 x i64>'
         assert v2t.IsSized()
         assert v2t.GetTypeContext() is self.ctx
 
@@ -675,19 +702,19 @@ class TestType(DumpTestCase):
 
     def test_void(self):
         void = llpy.core.VoidType(self.ctx)
-        assert str(void) == 'void'
+        assert self.ty_str(void) == 'void'
         assert not void.IsSized()
         assert void.GetTypeContext() is self.ctx
 
     def test_label(self):
         label = llpy.core.LabelType(self.ctx)
-        assert str(label) == 'label'
+        assert self.ty_str(label) == 'label'
         assert not label.IsSized()
         assert label.GetTypeContext() is self.ctx
 
     def test_x86_mmx(self):
         x86_mmx = llpy.core.X86MMXType(self.ctx)
-        assert str(x86_mmx) == 'x86_mmx'
+        assert self.ty_str(x86_mmx) == 'x86_mmx'
         assert x86_mmx.IsSized()
         assert x86_mmx.GetTypeContext() is self.ctx
         # I haven't managed to find anything else that doesn't segfault
@@ -715,7 +742,7 @@ class TestType(DumpTestCase):
         mdnit = mdni.TypeOf()
         mdnst = mdns.TypeOf()
         assert isinstance(mdst, llpy.core.MetadataType)
-        assert str(mdst) == 'metadata'
+        assert self.ty_str(mdst) == 'metadata'
         assert mdnet is mdst
         assert mdnit is mdst
         assert mdnst is mdst
@@ -729,16 +756,18 @@ class TestType(DumpTestCase):
                     continue
             assert md.GetValueName() == ''
 
-    def tearDown(self):
-        del self.ctx
-        gc.collect()
-
 class TestBuilder(DumpTestCase):
 
     def setUp(self):
         self.ctx = llpy.core.Context()
         self.mod = llpy.core.Module(self.ctx, 'TestBuilder')
         self.builder = llpy.core.IRBuilder(self.ctx)
+
+    def tearDown(self):
+        del self.builder
+        del self.mod
+        del self.ctx
+        gc.collect()
 
     def test_position(self):
         builder = self.builder
@@ -828,6 +857,15 @@ define void @func() {
 '''
 define i32 @func() {
   ret i32 0
+}
+
+''')
+        instr.SetOperand(0, i32.ConstAllOnes())
+        assert instr.GetOperand(0) is i32.ConstAllOnes()
+        self.assertDump(func,
+'''
+define i32 @func() {
+  ret i32 -1
 }
 
 ''')
@@ -3166,6 +3204,43 @@ define i8* @func(i32* %rhs) {
 
 ''')
 
+    if (3, 4) <= _version:
+        def test_BuildAddrSpaceCast(self):
+            builder = self.builder
+            i32p1 = llpy.core.PointerType(llpy.core.IntegerType(self.ctx, 32), 1)
+            i32p = llpy.core.PointerType(llpy.core.IntegerType(self.ctx, 32))
+            func_type = llpy.core.FunctionType(i32p1, [i32p])
+            func = self.mod.AddFunction(func_type, 'func')
+            rhs = func.GetParam(0)
+            rhs.SetValueName('rhs')
+            bb = func.AppendBasicBlock()
+            builder.PositionBuilderAtEnd(bb)
+
+            cinstr = builder.BuildAddrSpaceCast(i32p.ConstNull(), i32p1)
+            assert isinstance(cinstr, llpy.core.ConstantPointerNull)
+            assert cinstr is i32p1.ConstPointerNull()
+
+            assert rhs is builder.BuildAddrSpaceCast(rhs, i32p)
+
+            instr = builder.BuildAddrSpaceCast(rhs, i32p1, 'rv')
+            assert isinstance(instr, llpy.core.AddrSpaceCastInst)
+            assert instr.GetInstructionParent() is bb
+            assert instr.GetInstructionOpcode() == llpy.core.Opcode.AddrSpaceCast
+            assert instr.TypeOf() is i32p1
+
+            assert instr.GetNumOperands() == 1
+            assert instr.GetOperand(0) is rhs
+
+            builder.BuildRet(instr)
+            self.assertDump(func,
+'''
+define i32 addrspace(1)* @func(i32* %rhs) {
+  %rv = addrspacecast i32* %rhs to i32 addrspace(1)*
+  ret i32 addrspace(1)* %rv
+}
+
+''')
+
     @unittest.expectedFailure
     def test_BuildZExtOrBitCast(self):
         raise NotImplementedError
@@ -3786,13 +3861,110 @@ define i64 @func(i64* %lhs, i64* %rhs) {
 }
 
 ''')
-        pass
 
-    def tearDown(self):
-        del self.builder
-        del self.mod
-        del self.ctx
-        gc.collect()
+    if (3, 3) <= _version:
+        def test_BuildAtomicRMW(self):
+            AtomicRMWBinOp = llpy.core.AtomicRMWBinOp
+            AtomicOrdering = llpy.core.AtomicOrdering
+            ops = [
+                'Xchg',
+                'Add',
+                'Sub',
+                'And',
+                'Nand',
+                'Or',
+                'Xor',
+                'Max',
+                'Min',
+                'UMax',
+                'UMin',
+            ]
+            orders = [
+                ('NotAtomic', ''),
+                ('Unordered', 'unordered'),
+                ('Monotonic', 'monotonic'),
+                ('Acquire', 'acquire'),
+                ('Release', 'release'),
+                ('AcquireRelease', 'acq_rel'),
+                ('SequentiallyConsistent', 'seq_cst'),
+            ]
+            threads = [True, False]
+            for (op_name, order_name, single) in product(ops, orders, threads):
+                op = getattr(AtomicRMWBinOp, op_name)
+                order = getattr(AtomicOrdering, order_name[0])
+                op_name = op_name.lower()
+                order_name = order_name[1]
+                if order_name:
+                    order_name = ' ' + order_name
+                    if single:
+                        order_name = ' singlethread' + order_name
+
+                builder = self.builder
+                i32 = llpy.core.IntegerType(self.ctx, 32)
+                i32p = llpy.core.PointerType(i32)
+                func_type = llpy.core.FunctionType(i32, [i32p, i32])
+                func = self.mod.AddFunction(func_type, 'func')
+                ptr = func.GetParam(0)
+                ptr.SetValueName('ptr')
+                val = func.GetParam(1)
+                val.SetValueName('val')
+                bb = func.AppendBasicBlock()
+                builder.PositionBuilderAtEnd(bb)
+
+                old = builder.BuildAtomicRMW(op, ptr, val, order, single, 'old')
+                builder.BuildRet(old)
+                self.assertDump(func,
+'''
+define i32 @func(i32* %ptr, i32 %val) {{
+  %old = atomicrmw {op} i32* %ptr, i32 %val{order}
+  ret i32 %old
+}}
+
+'''.format(op=op_name, order=order_name))
+                func.SetValueName('')
+
+
+    if (3, 5) <= _version:
+        def test_BuildFence(self):
+            AtomicOrdering = llpy.core.AtomicOrdering
+            orders = [
+                ('NotAtomic', ''),
+                ('Unordered', 'unordered'),
+                ('Monotonic', 'monotonic'),
+                ('Acquire', 'acquire'),
+                ('Release', 'release'),
+                ('AcquireRelease', 'acq_rel'),
+                ('SequentiallyConsistent', 'seq_cst'),
+            ]
+            threads = [True, False]
+            for (order_name, single) in product(orders, threads):
+                order = getattr(AtomicOrdering, order_name[0])
+                order_name = order_name[1]
+                if order_name:
+                    order_name = ' ' + order_name
+                    if single:
+                        order_name = ' singlethread' + order_name
+
+                builder = self.builder
+                void = llpy.core.VoidType(self.ctx)
+                func_type = llpy.core.FunctionType(void, [])
+                func = self.mod.AddFunction(func_type, 'func')
+                bb = func.AppendBasicBlock()
+                builder.PositionBuilderAtEnd(bb)
+
+                builder.BuildFence(order, single)
+                builder.BuildRetVoid()
+                self.assertDump(func,
+'''
+define void @func() {{
+  fence{order}
+  ret void
+}}
+
+'''.format(order=order_name))
+                func.SetValueName('')
+
+
 
 class TestArgument(DumpTestCase):
 
@@ -3812,6 +3984,12 @@ class TestArgument(DumpTestCase):
         builder = llpy.core.IRBuilder(self.ctx)
         builder.PositionBuilderAtEnd(bb)
         builder.BuildRetVoid()
+
+    def tearDown(self):
+        del self.func
+        del self.mod
+        del self.ctx
+        gc.collect()
 
     def test_order(self):
         arg = self.func.GetParam(0)
@@ -3898,12 +4076,6 @@ define void @func(i32 zeroext align 1 %arg, i32 %brg) {
 
 ''')
 
-    def tearDown(self):
-        del self.func
-        del self.mod
-        del self.ctx
-        gc.collect()
-
 class TestBasicBlock(DumpTestCase):
 
     def setUp(self):
@@ -3912,6 +4084,11 @@ class TestBasicBlock(DumpTestCase):
         void = llpy.core.VoidType(self.ctx)
         func_type = llpy.core.FunctionType(void, [])
         self.func = self.mod.AddFunction(func_type, 'func')
+
+    def tearDown(self):
+        del self.mod
+        del self.ctx
+        gc.collect()
 
     def check_order(self, blocks):
         assert self.func.GetBasicBlocks() == blocks
@@ -3967,11 +4144,6 @@ class TestBasicBlock(DumpTestCase):
         assert call.GetPreviousInstruction() is None
         assert ret.GetPreviousInstruction() is call
 
-    def tearDown(self):
-        del self.mod
-        del self.ctx
-        gc.collect()
-
 
 class TestInlineAsm(DumpTestCase):
     __slots__ = ()
@@ -3980,6 +4152,10 @@ class TestInlineAsm(DumpTestCase):
         ctx = llpy.core.Context()
         void = llpy.core.VoidType(ctx)
         self.fty = llpy.core.FunctionType(void, [])
+
+    def tearDown(self):
+        del self.fty
+        gc.collect()
 
     def test_ff(self):
         asm = llpy.core.InlineAsm(self.fty, "asm_string", "constraints", False, False)
@@ -4004,10 +4180,6 @@ class TestInlineAsm(DumpTestCase):
         self.assertDump(asm,
 '''void ()* asm sideeffect alignstack "asm_string", "constraints"
 ''')
-
-    def tearDown(self):
-        del self.fty
-        gc.collect()
 
 class TestConstant(DumpTestCase):
     __slots__ = ()
@@ -4043,6 +4215,29 @@ class TestConstant(DumpTestCase):
         # doing it based on xi1/xi8 makes stuff break
         self.xp1 = self.i64.ConstInt(1).ConstIntToPtr(i64p)
         self.xp8 = self.i64.ConstInt(8).ConstIntToPtr(i64p)
+
+    def tearDown(self):
+        del self.ctx
+
+        del self.i1
+        del self.i64
+        del self.float
+
+        del self.false
+        del self.true
+        del self.int1
+        del self.int2
+        del self.float1
+        del self.float2
+
+        del self.xi1
+        del self.xi8
+        del self.xf1
+        del self.xf8
+        del self.xp1
+        del self.xp8
+
+        gc.collect()
 
     def test_ConstNeg(self):
         cnv = self.int1.ConstNeg()
@@ -4646,6 +4841,22 @@ class TestConstant(DumpTestCase):
         assert cne.GetOperand(0) is xp
         self.assertDump(cne, 'i1* bitcast (%s to i1*)\n' % (xp_dump))
 
+    if (3, 4) <= _version:
+        def test_ConstAddrSpaceCast(self):
+            i64p1 = llpy.core.PointerType(self.i64, 1)
+            i64p = llpy.core.PointerType(self.i64)
+            null64_1 = i64p1.ConstPointerNull()
+            null64 = i64p.ConstPointerNull()
+            xp = null64.ConstGEP([self.int1])
+            xp_dump = 'i64* getelementptr (i64* null, i64 1)'
+            cnv = null64_1.ConstAddrSpaceCast(i64p)
+            assert cnv is null64
+            cne = xp.ConstAddrSpaceCast(i64p1)
+            assert isinstance(cne, llpy.core.UnaryAddrSpaceCastConstantExpr)
+            assert cne.GetNumOperands() == 1
+            assert cne.GetOperand(0) is xp
+            self.assertDump(cne, 'i64 addrspace(1)* addrspacecast (%s to i64 addrspace(1)*)\n' % (xp_dump))
+
     @unittest.expectedFailure
     def test_ConstZExtOrBitCast(self):
         assert False
@@ -4793,28 +5004,13 @@ class TestConstant(DumpTestCase):
         #self.assertDump(cne, 'i64 insertelement (%s, %s, %s, %s)\n' % (xsv_dump, value_dump, 'i32 0', 'i32 1'))
         assert cne is self.ctx.ConstStruct([self.i64.ConstArray([self.xi1, value])])
 
-    def tearDown(self):
-        del self.ctx
-
-        del self.i1
-        del self.i64
-        del self.float
-
-        del self.false
-        del self.true
-        del self.int1
-        del self.int2
-        del self.float1
-        del self.float2
-
-        del self.xi1
-        del self.xi8
-        del self.xf1
-        del self.xf8
-        del self.xp1
-        del self.xp8
-
 class TestBlockAddress(DumpTestCase):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
 
     def test_it(self):
         ctx = llpy.core.Context()
@@ -4847,6 +5043,14 @@ class TestFunction(DumpTestCase):
         builder = llpy.core.IRBuilder(self.ctx)
         builder.PositionBuilderAtEnd(bb)
         builder.BuildRetVoid()
+
+    def tearDown(self):
+        del self.func_decl
+        del self.func_def
+        del self.i32
+        del self.mod
+        del self.ctx
+        gc.collect()
 
     def test_decl(self):
         assert self.func_decl.IsDeclaration()
@@ -4987,6 +5191,66 @@ define void @func_def() align 1 {
 declare i32 @func_decl() align 1
 
 define void @func_def() align 1 {
+  ret void
+}
+''')
+
+    if (3, 5) <= _version:
+        def test_dll_storage_class(self):
+            DLLStorageClass = llpy.core.DLLStorageClass
+            assert self.func_decl.GetDLLStorageClass() == DLLStorageClass.Default
+            self.func_decl.SetDLLStorageClass(DLLStorageClass.DLLImport)
+            assert self.func_decl.GetDLLStorageClass() == DLLStorageClass.DLLImport
+            self.assertDump(self.func_decl,
+'''
+declare dllimport i32 @func_decl()
+
+''')
+            assert self.func_def.GetDLLStorageClass() == DLLStorageClass.Default
+            self.func_def.SetDLLStorageClass(DLLStorageClass.DLLExport)
+            assert self.func_def.GetDLLStorageClass() == DLLStorageClass.DLLExport
+            self.assertDump(self.func_def,
+'''
+define dllexport void @func_def() {
+  ret void
+}
+
+''')
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestFunction'
+
+declare dllimport i32 @func_decl()
+
+define dllexport void @func_def() {
+  ret void
+}
+''')
+
+        def test_unnamed_addr(self):
+            assert self.func_decl.HasUnnamedAddr() == False
+            self.func_decl.SetUnnamedAddr(True)
+            assert self.func_decl.HasUnnamedAddr() == True
+            self.assertDump(self.func_decl,
+'''
+declare i32 @func_decl() unnamed_addr
+
+''')
+            assert self.func_def.HasUnnamedAddr() == False
+            self.func_def.SetUnnamedAddr(True)
+            assert self.func_def.HasUnnamedAddr() == True
+            self.assertDump(self.func_def,
+'''
+define void @func_def() unnamed_addr {
+  ret void
+}
+
+''')
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestFunction'
+
+declare i32 @func_decl() unnamed_addr
+
+define void @func_def() unnamed_addr {
   ret void
 }
 ''')
@@ -5247,17 +5511,27 @@ declare i32 @func_decl() #0
         f.SetLinkage(llpy.core.Linkage.Private)
         f.SetSection('section')
         f.SetVisibility(llpy.core.Visibility.Hidden)
+        if (3, 5) <= _version:
+            f.SetDLLStorageClass(llpy.core.DLLStorageClass.DLLImport)
+            f.SetUnnamedAddr(True)
         if _version <= (3, 2):
             self.assertDump(self.func_decl,
 '''
 declare private hidden fastcc i32 @func_decl() noreturn section "section" align 1 gc "gc"
 
 ''')
-        if (3, 3) <= _version:
+        if (3, 3) <= _version <= (3, 4):
             self.assertDump(self.func_decl,
 '''
 ; Function Attrs: noreturn
 declare private hidden fastcc i32 @func_decl() #0 section "section" align 1 gc "gc"
+
+''')
+        if (3, 5) <= _version:
+            self.assertDump(self.func_decl,
+'''
+; Function Attrs: noreturn
+declare private hidden dllimport fastcc i32 @func_decl() unnamed_addr #0 section "section" align 1 gc "gc"
 
 ''')
 
@@ -5276,13 +5550,9 @@ declare private hidden fastcc i32 @func_decl() #0 section "section" align 1 gc "
         with self.assertRaises(OSError):
             printf.Verify(llpy.core.VerifierFailureAction.ReturnStatus)
 
-    def tearDown(self):
-        del self.func_decl
-        del self.func_def
-        del self.i32
-        del self.mod
-        del self.ctx
-        gc.collect()
+    @unittest.expectedFailure
+    def test_GetIntrinsicID(self):
+        raise NotImplementedError
 
 
 class TestGlobalAlias(DumpTestCase):
@@ -5294,6 +5564,14 @@ class TestGlobalAlias(DumpTestCase):
         func_type = llpy.core.FunctionType(self.i32, [])
         self.func = self.mod.AddFunction(func_type, 'func')
         self.var = self.mod.AddGlobal(self.i32, 'var')
+
+    def tearDown(self):
+        del self.var
+        del self.func
+        del self.i32
+        del self.mod
+        del self.ctx
+        gc.collect()
 
     def test_decl(self):
         a = self.mod.AddAlias(self.func, 'func_alias')
@@ -5410,14 +5688,6 @@ declare i32 @func()
 declare i32 @func() align 1
 ''')
 
-    def tearDown(self):
-        del self.var
-        del self.func
-        del self.i32
-        del self.mod
-        del self.ctx
-        gc.collect()
-
 
 class TestGlobalVariable(DumpTestCase):
 
@@ -5428,6 +5698,57 @@ class TestGlobalVariable(DumpTestCase):
         self.ext = self.mod.AddGlobal(self.i32, 'ext')
         self.ini = self.mod.AddGlobal(self.i32, 'ini')
         self.ini.SetInitializer(self.i32.ConstInt(42))
+
+    def tearDown(self):
+        del self.ext
+        del self.ini
+        del self.i32
+        del self.mod
+        del self.ctx
+        gc.collect()
+
+    def test_order(self):
+        if (3, 3) <= _version:
+            self.ext.SetExternallyInitialized(True)
+            self.ini.SetExternallyInitialized(True)
+        self.ext.SetThreadLocal(True)
+        self.ini.SetThreadLocal(True)
+        self.ext.SetConstant(True)
+        self.ini.SetConstant(True)
+        self.ext.SetLinkage(llpy.core.Linkage.Private)
+        self.ini.SetLinkage(llpy.core.Linkage.Private)
+        self.ext.SetSection('foo')
+        self.ini.SetSection('foo')
+        self.ext.SetVisibility(llpy.core.Visibility.Hidden)
+        self.ini.SetVisibility(llpy.core.Visibility.Hidden)
+        self.ext.SetAlignment(1)
+        self.ini.SetAlignment(1)
+        if (3, 5) <= _version:
+            self.ext.SetDLLStorageClass(llpy.core.DLLStorageClass.DLLImport)
+            self.ini.SetDLLStorageClass(llpy.core.DLLStorageClass.DLLExport)
+            self.ext.SetUnnamedAddr(True)
+            self.ini.SetUnnamedAddr(True)
+        if _version <= (3, 2):
+            self.assertDump(self.ext, '@ext = private hidden thread_local constant i32, section "foo", align 1\n')
+            self.assertDump(self.ini, '@ini = private hidden thread_local constant i32 42, section "foo", align 1\n')
+            self.ext.SetLinkage(llpy.core.Linkage.External)
+            self.ini.SetLinkage(llpy.core.Linkage.External)
+            self.assertDump(self.ext, '@ext = external hidden thread_local constant i32, section "foo", align 1\n')
+            self.assertDump(self.ini, '@ini = hidden thread_local constant i32 42, section "foo", align 1\n')
+        if (3, 3) <= _version <= (3, 4):
+            self.assertDump(self.ext, '@ext = private hidden thread_local externally_initialized constant i32, section "foo", align 1\n')
+            self.assertDump(self.ini, '@ini = private hidden thread_local externally_initialized constant i32 42, section "foo", align 1\n')
+            self.ext.SetLinkage(llpy.core.Linkage.External)
+            self.ini.SetLinkage(llpy.core.Linkage.External)
+            self.assertDump(self.ext, '@ext = external hidden thread_local externally_initialized constant i32, section "foo", align 1\n')
+            self.assertDump(self.ini, '@ini = hidden thread_local externally_initialized constant i32 42, section "foo", align 1\n')
+        if (3, 5) <= _version:
+            self.assertDump(self.ext, '@ext = private hidden dllimport thread_local unnamed_addr externally_initialized constant i32, section "foo", align 1\n')
+            self.assertDump(self.ini, '@ini = private hidden dllexport thread_local unnamed_addr externally_initialized constant i32 42, section "foo", align 1\n')
+            self.ext.SetLinkage(llpy.core.Linkage.External)
+            self.ini.SetLinkage(llpy.core.Linkage.External)
+            self.assertDump(self.ext, '@ext = external hidden dllimport thread_local unnamed_addr externally_initialized constant i32, section "foo", align 1\n')
+            self.assertDump(self.ini, '@ini = hidden dllexport thread_local unnamed_addr externally_initialized constant i32 42, section "foo", align 1\n')
 
     def test_decl(self):
         assert self.ext.IsDeclaration()
@@ -5442,14 +5763,39 @@ class TestGlobalVariable(DumpTestCase):
 @ext = external global i32
 @ini = global i32 42
 ''')
+        if (3, 3) <= _version:
+            assert not self.ext.IsExternallyInitialized()
+            assert not self.ini.IsExternallyInitialized()
+            self.ext.SetExternallyInitialized(True)
+            self.ini.SetExternallyInitialized(True)
+            self.assertDump(self.ext, '@ext = external externally_initialized global i32\n')
+            self.assertDump(self.ini, '@ini = externally_initialized global i32 42\n')
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
+
+@ext = external externally_initialized global i32
+@ini = externally_initialized global i32 42
+''')
+            self.ext.SetExternallyInitialized(False)
+            self.ini.SetExternallyInitialized(False)
         self.ini.SetInitializer(None)
         self.assertDump(self.ini, '@ini = external global i32\n')
 
     def test_threadlocal(self):
+        if (3, 3) <= _version:
+            ThreadLocalMode = llpy.core.ThreadLocalMode
         assert not self.ext.IsThreadLocal()
+        if (3, 3) <= _version:
+            assert self.ext.GetThreadLocalMode() == ThreadLocalMode.NotThreadLocal
+            # bool checks
+            assert not self.ext.GetThreadLocalMode()
         self.ext.SetThreadLocal(True)
         self.assertDump(self.ext, '@ext = external thread_local global i32\n')
         assert not self.ini.IsThreadLocal()
+        if (3, 3) <= _version:
+            assert self.ini.GetThreadLocalMode() == ThreadLocalMode.NotThreadLocal
+            # bool checks
+            assert not self.ini.GetThreadLocalMode()
         self.ini.SetThreadLocal(True)
         self.assertDump(self.ini, '@ini = thread_local global i32 42\n')
         self.assertDump(self.mod,
@@ -5457,6 +5803,77 @@ class TestGlobalVariable(DumpTestCase):
 
 @ext = external thread_local global i32
 @ini = thread_local global i32 42
+''')
+        if (3, 3) <= _version:
+            assert self.ext.GetThreadLocalMode() == ThreadLocalMode.GeneralDynamic
+            assert self.ini.GetThreadLocalMode() == ThreadLocalMode.GeneralDynamic
+            # bool checks
+            assert self.ext.GetThreadLocalMode()
+            assert self.ini.GetThreadLocalMode()
+
+            self.ext.SetThreadLocalMode(ThreadLocalMode.NotThreadLocal)
+            self.ini.SetThreadLocalMode(ThreadLocalMode.NotThreadLocal)
+            assert self.ext.GetThreadLocalMode() == ThreadLocalMode.NotThreadLocal
+            assert self.ini.GetThreadLocalMode() == ThreadLocalMode.NotThreadLocal
+            assert not self.ext.IsThreadLocal()
+            assert not self.ini.IsThreadLocal()
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
+
+@ext = external global i32
+@ini = global i32 42
+''')
+
+            self.ext.SetThreadLocalMode(ThreadLocalMode.GeneralDynamic)
+            self.ini.SetThreadLocalMode(ThreadLocalMode.GeneralDynamic)
+            assert self.ext.GetThreadLocalMode() == ThreadLocalMode.GeneralDynamic
+            assert self.ini.GetThreadLocalMode() == ThreadLocalMode.GeneralDynamic
+            assert self.ext.IsThreadLocal()
+            assert self.ini.IsThreadLocal()
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
+
+@ext = external thread_local global i32
+@ini = thread_local global i32 42
+''')
+
+            self.ext.SetThreadLocalMode(ThreadLocalMode.LocalDynamic)
+            self.ini.SetThreadLocalMode(ThreadLocalMode.LocalDynamic)
+            assert self.ext.GetThreadLocalMode() == ThreadLocalMode.LocalDynamic
+            assert self.ini.GetThreadLocalMode() == ThreadLocalMode.LocalDynamic
+            assert self.ext.IsThreadLocal()
+            assert self.ini.IsThreadLocal()
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
+
+@ext = external thread_local(localdynamic) global i32
+@ini = thread_local(localdynamic) global i32 42
+''')
+
+            self.ext.SetThreadLocalMode(ThreadLocalMode.InitialExec)
+            self.ini.SetThreadLocalMode(ThreadLocalMode.InitialExec)
+            assert self.ext.GetThreadLocalMode() == ThreadLocalMode.InitialExec
+            assert self.ini.GetThreadLocalMode() == ThreadLocalMode.InitialExec
+            assert self.ext.IsThreadLocal()
+            assert self.ini.IsThreadLocal()
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
+
+@ext = external thread_local(initialexec) global i32
+@ini = thread_local(initialexec) global i32 42
+''')
+
+            self.ext.SetThreadLocalMode(ThreadLocalMode.LocalExec)
+            self.ini.SetThreadLocalMode(ThreadLocalMode.LocalExec)
+            assert self.ext.GetThreadLocalMode() == ThreadLocalMode.LocalExec
+            assert self.ini.GetThreadLocalMode() == ThreadLocalMode.LocalExec
+            assert self.ext.IsThreadLocal()
+            assert self.ini.IsThreadLocal()
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
+
+@ext = external thread_local(localexec) global i32
+@ini = thread_local(localexec) global i32 42
 ''')
 
     def test_constant(self):
@@ -5541,20 +5958,48 @@ class TestGlobalVariable(DumpTestCase):
 @ini = global i32 42, align 1
 ''')
 
-    @unittest.expectedFailure
-    def test_GetIntrinsicID(self):
-        raise NotImplementedError
+    if (3, 5) <= _version:
+        def test_dll_storage_class(self):
+            DLLStorageClass = llpy.core.DLLStorageClass
+            assert self.ext.GetDLLStorageClass() == DLLStorageClass.Default
+            self.ext.SetDLLStorageClass(DLLStorageClass.DLLImport)
+            assert self.ext.GetDLLStorageClass() == DLLStorageClass.DLLImport
+            self.assertDump(self.ext, '@ext = external dllimport global i32\n')
+            assert self.ini.GetDLLStorageClass() == DLLStorageClass.Default
+            self.ini.SetDLLStorageClass(DLLStorageClass.DLLExport)
+            assert self.ini.GetDLLStorageClass() == DLLStorageClass.DLLExport
+            self.assertDump(self.ini, '@ini = dllexport global i32 42\n')
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
 
-    def tearDown(self):
-        del self.ext
-        del self.ini
-        del self.i32
-        del self.mod
-        del self.ctx
-        gc.collect()
+@ext = external dllimport global i32
+@ini = dllexport global i32 42
+''')
+
+        def test_unnamed_addr(self):
+            assert self.ext.HasUnnamedAddr() == False
+            self.ext.SetUnnamedAddr(True)
+            assert self.ext.HasUnnamedAddr() == True
+            self.assertDump(self.ext, '@ext = external unnamed_addr global i32\n')
+            assert self.ini.HasUnnamedAddr() == False
+            self.ini.SetUnnamedAddr(True)
+            assert self.ini.HasUnnamedAddr() == True
+            self.assertDump(self.ini, '@ini = unnamed_addr global i32 42\n')
+            self.assertDump(self.mod,
+'''; ModuleID = 'TestGlobalVariable'
+
+@ext = external unnamed_addr global i32
+@ini = unnamed_addr global i32 42
+''')
 
 
 class TestInstruction(DumpTestCase):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
 
     @unittest.expectedFailure
     def test_metadata(self):
@@ -5562,6 +6007,12 @@ class TestInstruction(DumpTestCase):
 
 
 class TestAnyCallOrInvoke(DumpTestCase):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
 
     @unittest.expectedFailure
     def test_cc(self):
@@ -5578,12 +6029,24 @@ class TestAnyCallOrInvoke(DumpTestCase):
 
 class TestCallInst(DumpTestCase):
 
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
+
     @unittest.expectedFailure
     def test_tail(self):
         raise NotImplementedError
 
 
 class TestUse(DumpTestCase):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
 
     def test_use(self):
         ctx = llpy.core.Context()
@@ -5676,6 +6139,12 @@ define i32 @func(i32 %arg, i32 %brg) {
 @unittest.skip('NYI')
 class TestIRBuilder(unittest.TestCase):
 
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
+
     def test_position(self):
         pass
 
@@ -5686,6 +6155,12 @@ class TestIRBuilder(unittest.TestCase):
 @unittest.skip('NYI')
 class TestModuleProvider(unittest.TestCase):
 
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
+
     def test_none(self):
         ctx = llpy.core.Context()
         mod = llpy.core.Module(ctx, 'TestModuleProvider')
@@ -5694,12 +6169,24 @@ class TestModuleProvider(unittest.TestCase):
 @unittest.skip('NYI')
 class TestPassRegistry(unittest.TestCase):
 
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
+
     def test_singleton(self):
         gsi = llpy.core.PassRegistry.get_singleton_instance
         assert gsi() is gsi()
 
 @unittest.skip('NYI')
 class TestPassManager(unittest.TestCase):
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        gc.collect()
 
     def test_run(self):
         ctx = llpy.core.Context()
@@ -5713,6 +6200,10 @@ class TestFunctionPassManager(unittest.TestCase):
     def setUp(self):
         self.fpm = llpy.core.FunctionPassManager(mod)
 
+    def tearDown(self):
+        del self.fpm
+        gc.collect()
+
     def test_initialize(self):
         changed = self.fpm.initialize()
 
@@ -5722,9 +6213,31 @@ class TestFunctionPassManager(unittest.TestCase):
     def test_finalize(self):
         changed = self.fpm.finalize()
 
+
+class TestLLVM(unittest.TestCase):
+
+    def setUp(self):
+        pass
+
     def tearDown(self):
-        del self.fpm
         gc.collect()
+
+    if (3, 4) <= _version:
+        @unittest.skip('NYI')
+        def test_fatal_errors(self):
+            def handler(s):
+                pass
+            llpy.core.InstallFatalErrorHandler(handler)
+            llpy.core.ResetFatalErrorHandler()
+
+        @unittest.skip('NYI')
+        def test_pretty_stack(self):
+            llpy.core.EnablePrettyStackTrace()
+
+        def test_load_library(self):
+            llpy.core.LoadLibraryPermanently(llpy.c.core._library._cdll._name)
+            with self.assertRaises(OSError):
+                llpy.core.LoadLibraryPermanently('/nonexistent')
 
 if __name__ == '__main__':
     unittest.main()

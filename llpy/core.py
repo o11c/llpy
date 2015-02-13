@@ -28,6 +28,7 @@ from llpy.utils import u2b, b2u, deprecated, untested, dangerous
 from llpy.c import (
         _c,
         core as _core,
+        support as _support,
         analysis as _analysis,
         initialization as _initialization,
 )
@@ -45,10 +46,50 @@ from llpy.c.core import (
 
         _version,
 )
+if (3, 3) <= _version:
+    from llpy.c.core import (
+            AtomicRMWBinOp,
+            AtomicOrdering,
+            ThreadLocalMode,
+    )
+if (3, 5) <= _version:
+    from llpy.c.core import (
+            DLLStorageClass,
+            DiagnosticSeverity,
+    )
 from llpy.c.analysis import (
         VerifierFailureAction,
 )
 from llpy import __unknown_values as unknown_values
+
+
+if (3, 5) <= _version:
+    class DiagnosticInfo(object):
+        __slots__ = ('_raw',)
+
+        @untested
+        def __init__(self, raw):
+            self._raw = raw
+
+        @untested
+        def GetDescription(self):
+            return _message_to_string(_core.GetDiagInfoDescription(self._raw))
+
+        @untested
+        def GetSeverity(self):
+            return _core.GetDiagInfoSeverify(self._raw)
+
+    class X_DiagnosticHandler(object):
+        __slots__ = ('_ctx', '_handler')
+
+        def __call__(self, info, _opaque):
+            (self._handler)(self._ctx, info)
+
+    class X_YieldCallback(object):
+        __slots__ = ('_ctx', '_callback')
+
+        def __call__(self, _ctx, _opaque):
+            (self._callback)(self._ctx)
 
 class Context(object):
     ''' Contexts are execution states for the core LLVM IR system.
@@ -58,6 +99,8 @@ class Context(object):
         different contexts can execute on different threads simultaneously.
     '''
     __slots__ = ('_raw', 'type_cache', 'value_cache')
+    if (3, 5) <= _version:
+        __slots__ += ('_c_diagnostic_handler', '_c_yield_callback')
 
     def __init__(self):
         ''' Create a new context.
@@ -65,6 +108,9 @@ class Context(object):
         self._raw = _core.ContextCreate()
         self.type_cache = weakref.WeakValueDictionary()
         self.value_cache = weakref.WeakValueDictionary()
+        if (3, 5) <= _version:
+            self._c_diagnostic_handler = None
+            self._c_yield_callback = None
 
     # GetGlobalContext omitted ...
 
@@ -99,6 +145,21 @@ class Context(object):
         n = len(values)
         raw_values = (_core.Value * n)(*[i._raw for i in values])
         return Value(_core.MDNodeInContext(self._raw, raw_values, n), self)
+
+    if (3, 5) <= _version:
+        @untested
+        def SetDiagnosticHandler(self, handler):
+            if handler is not None:
+                handler = DiagnosticHandler(X_DiagnosticHandler(self, handler))
+            _core.ContextSetDiagnosticHandler(handler)
+            self._diagnostic_handler = handler
+
+        @untested
+        def SetYieldCallback(self, callback):
+            if callback is not None:
+                callback = YieldCallback(X_YieldCallback(self, callback))
+            _core.ContextSetDiagnosticHandler(callback)
+            self._yield_callback = callback
 
 class Module(object):
     ''' Modules represent the top-level structure in a LLVM program. An LLVM
@@ -341,6 +402,15 @@ class Type(object):
         assert self.IsSized()
         return Value(_core.SizeOf(self._raw), self._context)
 
+    if (3, 4) <= _version:
+        def Dump(self):
+            _core.DumpType(self._raw)
+
+        def PrintToString(self):
+            s = _core.PrintTypeToString(self._raw)
+            s = _message_to_string(s)
+            return s
+
 class IntegerType(Type):
     __slots__ = ()
 
@@ -535,7 +605,7 @@ class FunctionType(Type):
         at = [str(x) for x in self.GetParamTypes()]
         if self.IsVarArg():
             at.append('...')
-        return '%s(%s)' % (rt, ', '.join(at))
+        return '%s (%s)' % (rt, ', '.join(at))
 
     def IsVarArg(self):
         ''' Returns whether a function type is variadic.
@@ -865,9 +935,6 @@ class Value(object):
                             if _core.IsAGlobalVariable(value): return GlobalVariable
                             assert unknown_values, 'Uh-oh, unknown GlobalObject subclass.'
                             return GlobalObject
-                    if _core.IsAFunction(value): return Function
-                    if _core.IsAGlobalAlias(value): return GlobalAlias
-                    if _core.IsAGlobalVariable(value): return GlobalVariable
                     assert unknown_values, 'Uh-oh, unknown GlobalValue subclass.'
                     return GlobalValue
                 if _core.IsAUndefValue(value): return UndefValue
@@ -934,6 +1001,8 @@ class Value(object):
                 if _core.IsAUnaryInstruction(value):
                     if _core.IsAAllocaInst(value): return AllocaInst
                     if _core.IsACastInst(value):
+                        if (3, 4) <= _version:
+                            if _core.IsAAddrSpaceCastInst(value): return AddrSpaceCastInst
                         if _core.IsABitCastInst(value): return BitCastInst
                         if _core.IsAFPExtInst(value): return FPExtInst
                         if _core.IsAFPToSIInst(value): return FPToSIInst
@@ -953,6 +1022,13 @@ class Value(object):
                     if _core.IsAVAArgInst(value): return VAArgInst
                     assert unknown_values, 'Uh-oh, unknown UnaryInstruction subclass.'
                     return UnaryInstruction
+                opcode = _core.GetInstructionOpcode(value)
+                if (3, 3) <= _version:
+                    if opcode == Opcode.AtomicRMW: return AtomicRMWInst
+                if (3, 5) <= _version:
+                    if opcode == Opcode.Fence: return FenceInst
+                assert unknown_values, 'Uh-oh, unknown Instruction subclass (opcode: %s).' % opcode
+                return Instruction
             assert unknown_values, 'Uh-oh, unknown User subclass.'
             return User
         assert unknown_values, 'Uh-oh, unknown Value subclass.'
@@ -982,6 +1058,12 @@ class Value(object):
             instances until GetNextUse() returns None.
         '''
         return Use(_core.GetFirstUse(self._raw), self._context)
+
+    if (3, 4) <= _version:
+        def PrintToString(self):
+            s = _core.PrintValueToString(self._raw)
+            s = _message_to_string(s)
+            return s
 
 class Argument(Value):
     __slots__ = ()
@@ -1123,6 +1205,23 @@ class InlineAsm(Value):
 class MDNode(Value):
     __slots__ = ()
 
+    @untested
+    def GetOperand(self, index):
+        return Value(_core.GetOperand(self._raw, index), self._context)
+
+    @untested
+    def GetNumOperands(self):
+        return _core.GetNumOperands(self._raw)
+
+    @untested
+    def GetOperands(self):
+        num = _core.GetMDNodeNumOperands(self._raw)
+        if not num:
+            return []
+        temp_buf = (_core.Value * num)()
+        _core.GetMDNodeOperands(self._raw, temp_buf)
+        return [Value(v, self._context) for v in temp_buf]
+
 class MDString(Value):
     __slots__ = ()
 
@@ -1138,7 +1237,6 @@ class User(Value):
     def GetOperand(self, index):
         return Value(_core.GetOperand(self._raw, index), self._context)
 
-    @untested
     def SetOperand(self, index, value):
         _core.SetOperand(self._raw, index, value._raw)
 
@@ -1294,6 +1392,10 @@ class  Constant(User):
 
     def ConstBitCast(self, ty):
         return Value(_core.ConstBitCast(self._raw, ty._raw), self._context)
+
+    if (3, 4) <= _version:
+        def ConstAddrSpaceCast(self, ty):
+            return Value(_core.ConstAddrSpaceCast(self._raw, ty._raw), self._context)
 
     @deprecated
     @untested
@@ -1507,6 +1609,10 @@ ConstantExpr._subclasses[Opcode.IntToPtr] = UnaryIntToPtrConstantExpr
 class     UnaryBitCastConstantExpr(UnaryConstantExpr):
     __slots__ = ()
 ConstantExpr._subclasses[Opcode.BitCast] = UnaryBitCastConstantExpr
+if (3, 4) <= _version:
+    class     UnaryAddrSpaceCastConstantExpr(UnaryConstantExpr):
+        __slots__ = ()
+    ConstantExpr._subclasses[Opcode.AddrSpaceCast] = UnaryAddrSpaceCastConstantExpr
 
 class    CompareConstantExpr(ConstantExpr):
     __slots__ = ()
@@ -1633,6 +1739,19 @@ class   GlobalValue(Constant):
     def GetAlignment(self):
         return _core.GetAlignment(self._raw)
 
+    if (3, 5) <= _version:
+        def GetDLLStorageClass(self):
+            return _core.GetDLLStorageClass(self._raw)
+
+        def SetDLLStorageClass(self, dllsc):
+            _core.SetDLLStorageClass(self._raw, dllsc)
+
+        def HasUnnamedAddr(self):
+            return _core.HasUnnamedAddr(self._raw)
+
+        def SetUnnamedAddr(self, ua):
+            _core.SetUnnamedAddr(self._raw, ua)
+
 
 class    GlobalAlias(GlobalValue):
     __slots__ = ()
@@ -1739,6 +1858,11 @@ class     Function(GlobalObject):
         ''' Remove an attribute from a function.
         '''
         _core.RemoveFunctionAttr(self._raw, attr)
+
+    if (3, 3) <= _version:
+        @untested
+        def AddTargetDependentAttr(self, attr, val):
+            _core.AddTaretDependentFunctionAttr(self._raw, u2b(attr), u2b(val))
 
     def CountParams(self):
         ''' Obtain the number of parameters in a function.
@@ -1871,6 +1995,19 @@ class     GlobalVariable(GlobalObject):
 
     def SetThreadLocal(self, is_tl):
         _core.SetThreadLocal(self._raw, is_tl)
+
+    if (3, 3) <= _version:
+        def GetThreadLocalMode(self):
+            return _core.GetThreadLocalMode(self._raw)
+
+        def SetThreadLocalMode(self, tlm):
+            _core.SetThreadLocalMode(self._raw, tlm)
+
+        def IsExternallyInitialized(self):
+            return _core.IsExternallyInitialized(self._raw)
+
+        def SetExternallyInitialized(self, ei):
+            _core.SetExternallyInitialized(self._raw, ei)
 
     def IsConstant(self):
         return bool(_core.IsGlobalConstant(self._raw))
@@ -2143,6 +2280,10 @@ class    AllocaInst(UnaryInstruction):
 class    CastInst(UnaryInstruction):
     __slots__ = ()
 
+if (3, 4) <= _version:
+    class     AddrSpaceCastInst(CastInst):
+        __slots__ = ()
+
 class     BitCastInst(CastInst):
     __slots__ = ()
 
@@ -2188,6 +2329,14 @@ class    LoadInst(UnaryInstruction, AnyMemAccessInst):
 class    VAArgInst(UnaryInstruction):
     __init__ = untested(lambda *args: None)
     __slots__ = ()
+
+if (3, 3) <= _version:
+    class    AtomicRMWInst(Instruction):
+        __slots__ = ()
+
+if (3, 5) <= _version:
+    class    FenceInst(Instruction):
+        __slots__ = ()
 
 
 
@@ -2505,6 +2654,10 @@ class IRBuilder(object):
     def BuildBitCast(self, rhs, ty, name=''):
         return Value(_core.BuildBitCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
 
+    if (3, 4) <= _version:
+        def BuildAddrSpaceCast(self, rhs, ty, name=''):
+            return Value(_core.BuildAddrSpaceCast(self._raw, rhs._raw, ty._raw, u2b(name)), self._context)
+
     @deprecated
     @untested
     def BuildZExtOrBitCast(self, rhs, ty, name):
@@ -2587,6 +2740,20 @@ class IRBuilder(object):
     def BuildPtrDiff(self, lhs, rhs, name=''):
         return Value(_core.BuildPtrDiff(self._raw, lhs._raw, rhs._raw, u2b(name)), self._context)
 
+    if (3, 3) <= _version:
+        def BuildAtomicRMW(self, op, ptr, val, order, single, name=''):
+            rv = Value(_core.BuildAtomicRMW(self._raw, op, ptr._raw, val._raw, order, single), self._context)
+            # This function from the C API doesn't include the name argument,
+            # so make an extra call to set it.
+            if name:
+                rv.SetValueName(name)
+            return rv
+
+    if (3, 5) <= _version:
+        def BuildFence(self, order, single):
+            name = ''
+            return Value(_core.BuildFence(self._raw, order, single, u2b(name)), self._context)
+
 class ModuleProvider(object):
     __slots__ = ('_raw', '_mod')
 
@@ -2616,7 +2783,16 @@ def _message_to_string(message):
 class MemoryBuffer(object):
     __slots__ = ('_raw',)
 
-    def __init__(self, filename):
+    def __init__(self, filename, body=None):
+        if body is not None:
+            assert filename is not None
+            assert (3, 3) <= _version
+            assert isinstance(body, bytes)
+            size = len(body)
+            filename = u2b(filename)
+            self._raw = _core.CreateMemoryBufferWithMemoryRangeCopy(body, size, filename)
+            return
+
         self._raw = _core.MemoryBuffer()
         error = _c.string_buffer()
 
@@ -2628,6 +2804,13 @@ class MemoryBuffer(object):
 
         if rv:
             raise OSError(error)
+
+    if (3, 3) <= _version:
+        def Get(self):
+            ptr = _core.GetBufferStart(self._raw)
+            size = _core.GetBufferSize(self._raw)
+            arr = ctypes.cast(ptr, ctypes.POINTER(ctypes.c_char * size))
+            return arr.contents.raw
 
     def __del__(self):
         _core.DisposeMemoryBuffer(self._raw)
@@ -2778,3 +2961,37 @@ class FunctionPassManager(PassManagerBase):
             Returns 1 if any of the passes modified the module, 0 otherwise.
         '''
         return bool(_core.FinalizeFunctionPassManager(self._raw))
+
+if (3, 4) <= _version:
+    _py_fatal_error_handler = None
+
+    # Be careful with the lifetimes here!
+
+    @_core.FatalErrorHandler
+    def _c_fatal_error_handler(c_str):
+        _py_fatal_error_handler(b2u(c_str))
+
+    # TODO figure out whether it's even *possible* to test this?
+    @untested
+    def InstallFatalErrorHandler(handler):
+        global _py_fatal_error_handler
+        had = _py_fatal_error_handler is not None
+        _py_fatal_error_handler = handler
+        if not had:
+            _core.InstallFatalErrorHandler(_c_fatal_error_handler)
+
+    @untested
+    def ResetFatalErrorHandler():
+        global _py_fatal_error_handler
+        _core.ResetFatalErrorHandler()
+        _py_fatal_error_handler = None
+
+    @untested
+    def EnablePrettyStackTrace():
+        _core.EnablePrettyStackTrace()
+
+
+if (3, 4) <= _version:
+    def LoadLibraryPermanently(lib):
+        if _support.LoadLibraryPermanently(u2b(lib)):
+            raise OSError('Could not open library %r' % lib)

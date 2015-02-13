@@ -24,18 +24,34 @@ import ctypes
 from ..core import _library
 from ..core import PassManager
 
+from ...utils import cuntested as untested
+
 
 AddArgumentPromotionPass = _library.function(None, 'LLVMAddArgumentPromotionPass', [PassManager])
+AddArgumentPromotionPass = untested(AddArgumentPromotionPass)
 AddConstantMergePass = _library.function(None, 'LLVMAddConstantMergePass', [PassManager])
+AddConstantMergePass = untested(AddConstantMergePass)
 AddDeadArgEliminationPass = _library.function(None, 'LLVMAddDeadArgEliminationPass', [PassManager])
+AddDeadArgEliminationPass = untested(AddDeadArgEliminationPass)
 AddFunctionAttrsPass = _library.function(None, 'LLVMAddFunctionAttrsPass', [PassManager])
+AddFunctionAttrsPass = untested(AddFunctionAttrsPass)
 AddFunctionInliningPass = _library.function(None, 'LLVMAddFunctionInliningPass', [PassManager])
+AddFunctionInliningPass = untested(AddFunctionInliningPass)
 AddAlwaysInlinerPass = _library.function(None, 'LLVMAddAlwaysInlinerPass', [PassManager])
+AddAlwaysInlinerPass = untested(AddAlwaysInlinerPass)
 AddGlobalDCEPass = _library.function(None, 'LLVMAddGlobalDCEPass', [PassManager])
+AddGlobalDCEPass = untested(AddGlobalDCEPass)
 AddGlobalOptimizerPass = _library.function(None, 'LLVMAddGlobalOptimizerPass', [PassManager])
+AddGlobalOptimizerPass = untested(AddGlobalOptimizerPass)
 AddIPConstantPropagationPass = _library.function(None, 'LLVMAddIPConstantPropagationPass', [PassManager])
+AddIPConstantPropagationPass = untested(AddIPConstantPropagationPass)
 AddPruneEHPass = _library.function(None, 'LLVMAddPruneEHPass', [PassManager])
+AddPruneEHPass = untested(AddPruneEHPass)
 AddIPSCCPPass = _library.function(None, 'LLVMAddIPSCCPPass', [PassManager])
+AddIPSCCPPass = untested(AddIPSCCPPass)
 AddInternalizePass = _library.function(None, 'LLVMAddInternalizePass', [PassManager, ctypes.c_uint])
+AddInternalizePass = untested(AddInternalizePass)
 AddStripDeadPrototypesPass = _library.function(None, 'LLVMAddStripDeadPrototypesPass', [PassManager])
+AddStripDeadPrototypesPass = untested(AddStripDeadPrototypesPass)
 AddStripSymbolsPass = _library.function(None, 'LLVMAddStripSymbolsPass', [PassManager])
+AddStripSymbolsPass = untested(AddStripSymbolsPass)
