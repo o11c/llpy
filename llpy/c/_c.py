@@ -69,7 +69,7 @@ def enum(name, **kwargs):
     class Enum(ctypes.Structure):
         __slots__ = ()
         _fields_ = [('value', ety)]
-        _names = {v: k for k, v in kwargs.items()}
+        _enum_names = {v: k for k, v in kwargs.items()}
 
         def __hash__(self):
             return hash(self.value)
@@ -86,7 +86,7 @@ def enum(name, **kwargs):
 
         def __repr__(self):
             try:
-                name = Enum._names[self.value]
+                name = Enum._enum_names[self.value]
             except KeyError:
                 if self.value:
                     return '%s(%d)' % (Enum.__name__, self.value)
@@ -107,7 +107,7 @@ def bit_enum(name, **kwargs):
     class Enum(ctypes.Structure):
         __slots__ = ()
         _fields_ = [('value', ety)]
-        _names = {v: k for k, v in kwargs.items()}
+        _enum_names = {v: k for k, v in kwargs.items()}
 
         def __hash__(self):
             return hash(self.value)
@@ -148,7 +148,7 @@ def bit_enum(name, **kwargs):
             while value:
                 if value & itr:
                     try:
-                        name = Enum._names[itr]
+                        name = Enum._enum_names[itr]
                     except KeyError:
                         fail |= itr
                     else:
