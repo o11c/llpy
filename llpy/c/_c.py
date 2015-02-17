@@ -40,6 +40,9 @@ class Library(object):
     def __init__(self, name):
         self._cdll = ctypes.cdll.LoadLibrary(name)
 
+    def __repr__(self):
+        return 'Library(%r)' % self._cdll._name
+
     def variable(self, typ, name):
         return typ.in_dll(self._cdll, name)
 

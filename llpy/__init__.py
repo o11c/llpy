@@ -27,9 +27,6 @@ All use of these functions is subject to change without notice. Once the
 proper data is filled in and remaining wrappers and testcases are written,
 they will no longer be necessary, except when new LLVM APIs are written.
 '''
-import os
-import sys
-import warnings
 
 
 def check_deprecation(value):
@@ -58,31 +55,6 @@ def allow_unknown_machines(value):
     global __allow_unknown_machines
     __allow_unknown_machines = bool(value)
 
-def set_library_patterns(llvm, lto):
-    global __library_pattern_llvm
-    global __library_pattern_lto
-    assert len(llvm.replace('%%', '').split('%d')) == 3
-    assert len(lto.replace('%%', '').split('%d')) == 3
-    __library_pattern_llvm = llvm
-    __library_pattern_lto = lto
-
-def set_llvm_version(version):
-    global __library_version
-    if version is not None:
-        version = tuple(int(x) for x in version.split('.'))
-        assert __MIN_LLVM_VERSION <= version #<= __MAX_LLVM_VERSION
-
-        if version not in __TESTED_LLVM_VERSIONS:
-            warnings.warn('Untested LLVM library version: %d.%d' % version)
-    __library_version = version
-
-def __no_more_version_changes():
-    global set_library_patterns, set_llvm_version, __no_more_version_changes
-    del set_library_patterns
-    del set_llvm_version
-    def __no_more_version_changes():
-        pass
-
 __deprecate = False
 __untested = False
 __cuntested = False
@@ -91,35 +63,3 @@ __unknown_values = False
 
 __native_fallback_all = True
 __allow_unknown_machines = False
-
-__MIN_LLVM_VERSION = (3, 0)
-# __MAX_LLVM_VERSION = (3, 3)
-__TESTED_LLVM_VERSIONS = [
-        (3, 0),
-        (3, 1),
-        (3, 2),
-        (3, 3),
-        (3, 4),
-        (3, 5),
-        # (3, 6),
-]
-
-# Note: if adding windows support, also need to fix TODO in llpy/c/lto.py
-platforms = {
-    'linux': {
-        'llvm': 'libLLVM-%d.%d.so.1',
-        'lto': '/usr/lib/llvm-%d.%d/lib/libLTO.so'
-    },
-}
-platforms['linux2'] = platforms['linux'] # python 3.2 and earlier
-
-# key is `uname -m` and value is `LLVM_NATIVE_ARCH` from llvm/Config/config.h
-# If allow_unknown_machines() is enabled, will fall back to "all arches".
-machines = {
-    'i686': 'X86',
-    'x86_64': 'X86',
-}
-
-set_library_patterns(**platforms[sys.platform])
-
-set_llvm_version(os.getenv('LLPY_LLVM_VERSION'))

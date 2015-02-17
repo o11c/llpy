@@ -23,35 +23,12 @@
 
 import ctypes
 
-from . import _c
+from . import _c, _detect
 
-# Note: this logic is duplicated in _c2.py
-from llpy import (
-        __library_pattern_lto as __pattern,
-        __library_version as _version,
-        __TESTED_LLVM_VERSIONS,
-        __no_more_version_changes,
-)
+_library = _detect.llvm.lib_lto
+_version = _detect.llvm.version
 
 from ..utils import cuntested as untested
-
-
-__no_more_version_changes()
-if _version is not None:
-    _library = _c.Library(__pattern % _version)
-else:
-    e = None
-    for _version in reversed(__TESTED_LLVM_VERSIONS):
-        try:
-            _library = _c.Library(__pattern % _version)
-        except OSError as e_:
-            e = e_
-            continue
-        else:
-            del e
-            break
-    else:
-        raise e
 
 
 if _version <= (3, 3):

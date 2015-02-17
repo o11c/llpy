@@ -21,9 +21,10 @@
 
 import ctypes
 
-from . import _c
+from . import _c, _detect
 
-from ._c2 import _library, _version
+_library = _detect.llvm.lib_llvm
+_version = _detect.llvm.version
 
 if _version <= (3, 4):
     from .core import Bool

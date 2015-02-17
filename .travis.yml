@@ -10,7 +10,12 @@ python:
 install:
   - for PPA in $PPAS; do sudo add-apt-repository --yes $PPA; done
   - sudo apt-get update -qq
-  - sudo apt-get install libllvm$LLPY_LLVM_VERSION
+# need libllvm-x.y      for most tests
+# need llvm-x.y-dev     for LTO tests
+# need llvm-x.y         for external opt/llc/llvm-as/llvm-dis/llvm-link/llvm-config
+# need llvm-x.y-runtime for external lli
+# need clang-x.y        for external clang
+  - sudo apt-get install libllvm$LLPY_LLVM_VERSION llvm-$LLPY_LLVM_VERSION-dev
 script:
   - python ./runtests.py
 env:

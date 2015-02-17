@@ -25,7 +25,7 @@ import warnings
 
 import llpy
 
-from . import _c
+from . import _c, _hardcoded
 
 from .core import _library, _version
 from .core import Context
@@ -97,27 +97,7 @@ def add_target(target):
 
 # This is a list of all the targets I've found across all LLVM versions
 # that I can test. If I missed one, you can call add_target yourself.
-for target in [
-    'AArch64',
-    'Alpha',
-    'ARM',
-    'Blackfin',
-    'CBackend',
-    'CellSPU',
-    'CppBackend',
-    'Hexagon',
-    'MBlaze',
-    'Mips',
-    'MSP430',
-    'NVPTX',
-    'PowerPC',
-    'PTX',
-    'R600',
-    'Sparc',
-    'SystemZ',
-    'XCore',
-    'X86',
-]:
+for target in _hardcoded.TARGETS:
     add_target(target)
 del target
 
@@ -167,7 +147,7 @@ if (3, 1) <= _version:
         for target in ALL_DISASSEMBLERS:
             globals()['Initialize%sDisassembler' % target]()
 
-_native = llpy.machines.get(os.uname()[4])
+_native = _hardcoded.MACHINES.get(os.uname()[4])
 
 # TODO in 3.4 you can maybe use GetDefaultTargetTriple?
 if not llpy.__allow_unknown_machines:
